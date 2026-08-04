@@ -1,0 +1,98 @@
+.home-table {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+}
+
+.home-table__title {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-title);
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  color: var(--color-groseille);
+  -webkit-text-stroke: 7px var(--color-cream);
+  paint-order: stroke fill;
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.home-object {
+  position: absolute;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  filter: drop-shadow(4px 10px 10px rgba(0, 0, 0, 0.3));
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.home-object:hover {
+  filter: drop-shadow(6px 16px 14px rgba(0, 0, 0, 0.35));
+}
+
+.home-object img {
+  width: 300px;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}
+
+.home-object--carnet {
+  top: 4%;
+  left: 3%;
+  transform: rotate(-7deg);
+}
+.home-object--carnet:hover {
+  transform: rotate(-7deg) translateY(-8px) scale(1.05);
+}
+
+.home-object--pantry {
+  top: 6%;
+  right: 4%;
+  transform: rotate(8deg);
+}
+.home-object--pantry img {
+  width: 320px;
+}
+.home-object--pantry:hover {
+  transform: rotate(8deg) translateY(-8px) scale(1.05);
+}
+
+.home-object--menus {
+  bottom: 5%;
+  right: 11%;
+  transform: rotate(-6deg);
+}
+.home-object--menus:hover {
+  transform: rotate(-6deg) translateY(-8px) scale(1.05);
+}
+
+.home-object--stats {
+  bottom: 9%;
+  left: 19%;
+  transform: rotate(6deg);
+}
+.home-object--stats img {
+  width: 260px;
+}
+.home-object--stats:hover {
+  transform: rotate(6deg) translateY(-8px) scale(1.05);
+}
+
+@media (max-width: 640px) {
+  .home-table__title {
+    font-size: clamp(2rem, 8vw, 2.8rem);
+    -webkit-text-stroke: 5px var(--color-cream);
+  }
+  .home-object img {
+    width: 190px;
+  }
+  .home-object--pantry img {
+    width: 210px;
+  }
+}

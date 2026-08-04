@@ -1,0 +1,32 @@
+.menu-form {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.menu-form__row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 10px;
+}
+.menu-form textarea {
+  width: 100%;
+}
+.menu-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+.menu-form__actions .form-submit {
+  padding: 9px 20px;
+  font-size: 0.9rem;
+}
+@media (max-width: 600px) {
+  .menu-form__row {
+    grid-template-columns: 1fr;
+  }
+}

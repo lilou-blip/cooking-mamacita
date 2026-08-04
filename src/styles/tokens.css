@@ -1,0 +1,43 @@
+:root {
+  /* Palette — cottagecore carnet de recettes */
+  --color-cream: #fdf6ec;
+  --color-cream-deep: #f7ecda;
+  --color-blush: #f4c2c2;
+  --color-blush-deep: #e8b4b8;
+  --color-groseille: #c0392b;
+  --color-groseille-deep: #9c2e21;
+  --color-autumn-orange: #d97d3d;
+  --color-brown: #6b4226;
+  --color-ink: #4a3b32;
+  --color-ink-soft: #7a6a5d;
+  --color-white: #ffffff;
+
+  /* Typo */
+  --font-title: "Caveat", cursive;
+  --font-body: "Nunito", sans-serif;
+
+  /* Forme */
+  --radius-page: 18px;
+  --radius-card: 14px;
+  --radius-tag: 999px;
+  --shadow-page: 0 12px 30px rgba(107, 66, 38, 0.18);
+  --shadow-card: 0 4px 14px rgba(107, 66, 38, 0.12);
+
+  /* Vichy (gingham) — bandeau d'accent */
+  --gingham-size: 16px;
+  --gingham-color: var(--color-blush);
+  --gingham-pattern: repeating-linear-gradient(
+      0deg,
+      var(--gingham-color) 0,
+      var(--gingham-color) var(--gingham-size),
+      transparent var(--gingham-size),
+      transparent calc(var(--gingham-size) * 2)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--gingham-color) 0,
+      var(--gingham-color) var(--gingham-size),
+      transparent var(--gingham-size),
+      transparent calc(var(--gingham-size) * 2)
+    );
+}

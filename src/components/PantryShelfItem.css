@@ -1,0 +1,150 @@
+.pantry-shelf-item {
+  position: relative;
+}
+
+.pantry-shelf-item__token {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+}
+
+.pantry-shelf-item__icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px solid var(--color-white);
+  transition: transform 0.15s ease;
+}
+.pantry-shelf-item__token:hover .pantry-shelf-item__icon {
+  transform: translateY(-3px);
+}
+.pantry-shelf-item--expired .pantry-shelf-item__icon {
+  border-color: var(--color-groseille);
+}
+.pantry-shelf-item--soon .pantry-shelf-item__icon {
+  border-color: var(--color-autumn-orange);
+}
+
+.pantry-shelf-item__icon img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+
+.pantry-shelf-item__initial {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--color-groseille-deep);
+}
+
+.pantry-shelf-item__quantity {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--color-groseille-deep);
+  background: rgba(255, 253, 248, 0.9);
+  padding: 1px 8px;
+  border-radius: var(--radius-tag);
+}
+
+.pantry-shelf-item__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  background: rgba(255, 253, 248, 0.9);
+  padding: 1px 8px;
+  border-radius: var(--radius-tag);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pantry-shelf-item__location {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-groseille-deep);
+  background: var(--color-blush);
+  padding: 1px 8px;
+  border-radius: var(--radius-tag);
+}
+
+.pantry-shelf-item__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  box-shadow: 0 10px 24px rgba(74, 59, 50, 0.3);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+}
+
+.pantry-shelf-item__expiry {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+}
+.pantry-shelf-item__expiry--soon {
+  color: var(--color-autumn-orange);
+}
+.pantry-shelf-item__expiry--expired {
+  color: var(--color-groseille);
+}
+
+.pantry-shelf-item__consume-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pantry-shelf-item__consume-form input {
+  width: 100px;
+  border: 1.5px solid var(--color-blush-deep);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-family: var(--font-body);
+  background: var(--color-cream);
+}
+.pantry-shelf-item__consume-form select {
+  flex: 1;
+  min-width: 90px;
+}
+.pantry-shelf-item__consume-form button {
+  font-size: 0.78rem;
+  padding: 5px 12px;
+}
+
+.pantry-shelf-item__delete {
+  background: none;
+  border: none;
+  color: var(--color-groseille-deep);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-align: left;
+}
+.pantry-shelf-item__delete:hover {
+  color: var(--color-groseille);
+}

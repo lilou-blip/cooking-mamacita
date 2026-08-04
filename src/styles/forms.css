@@ -1,0 +1,39 @@
+.form-error {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  padding: 10px 14px;
+  border-radius: var(--radius-card);
+  font-weight: 700;
+  margin: 0;
+}
+
+.form-cancel {
+  background: none;
+  border: none;
+  color: var(--color-ink-soft);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.form-cancel:hover {
+  color: var(--color-groseille);
+}
+
+.form-submit {
+  background: var(--color-groseille);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-card);
+  padding: 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.form-submit:hover {
+  background: var(--color-groseille-deep);
+}
+.form-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

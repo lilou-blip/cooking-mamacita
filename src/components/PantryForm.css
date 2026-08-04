@@ -1,0 +1,83 @@
+.pantry-form {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pantry-form__row {
+  display: grid;
+  grid-template-columns: 1.3fr 0.6fr 0.7fr 0.9fr 0.9fr 0.9fr;
+  gap: 10px;
+  align-items: end;
+}
+.pantry-form__row input,
+.pantry-form__row select {
+  width: 100%;
+}
+.pantry-form__expiry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+}
+
+.pantry-form__assignments {
+  background: var(--color-cream);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+.pantry-form__assignments-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-soft);
+  margin-bottom: 8px;
+}
+.pantry-form__assignments-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.pantry-form__assignment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.pantry-form__assignment input {
+  width: 64px;
+}
+.pantry-form__unassigned {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+  font-weight: 700;
+}
+
+.pantry-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+}
+.pantry-form__actions .form-submit {
+  padding: 9px 20px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .pantry-form__row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

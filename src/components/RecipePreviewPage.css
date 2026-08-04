@@ -1,0 +1,24 @@
+.preview-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+}
+.preview-page--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-soft);
+  font-family: var(--font-title);
+  font-size: 1.4rem;
+  padding: 40px;
+  line-height: 1.4;
+}
+.preview-page__illustrations {
+  margin: 8px auto 18px;
+}
+.preview-page__open {
+  margin-top: auto;
+  align-self: center;
+  padding: 10px 26px;
+}

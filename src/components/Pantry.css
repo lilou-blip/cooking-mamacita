@@ -1,0 +1,111 @@
+.pantry__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.pantry__header h1 {
+  font-family: var(--font-title);
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  color: var(--color-groseille-deep);
+  margin: 0;
+}
+.pantry__add {
+  background: var(--color-groseille);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 8px 18px;
+  font-weight: 800;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.pantry__add:hover {
+  background: var(--color-groseille-deep);
+}
+
+.pantry__empty {
+  text-align: center;
+  color: var(--color-ink-soft);
+  font-family: var(--font-title);
+  font-size: 1.4rem;
+  margin-top: 40px;
+}
+
+.pantry-themed {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+}
+
+.pantry-themed__back,
+.pantry-themed__add {
+  position: absolute;
+  top: 24px;
+  background: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 8px 18px;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--color-groseille-deep);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  z-index: 2;
+}
+.pantry-themed__back {
+  left: 24px;
+}
+.pantry-themed__add {
+  right: 24px;
+}
+.pantry-themed__back:hover,
+.pantry-themed__add:hover {
+  background: var(--color-blush);
+}
+
+.pantry-themed__title {
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: clamp(2rem, 4.5vw, 2.8rem);
+  color: var(--color-groseille);
+  -webkit-text-stroke: 5px var(--color-cream);
+  paint-order: stroke fill;
+  margin: 24px 0 4px;
+  pointer-events: none;
+}
+
+.pantry-themed__shelf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: 26px 20px;
+  padding: 40px 8% 60px;
+}
+
+.pantry-themed__empty {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  color: var(--color-ink);
+  background: rgba(255, 253, 248, 0.9);
+  padding: 10px 20px;
+  border-radius: var(--radius-tag);
+}
+
+.pantry-themed__form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 59, 50, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  z-index: 10;
+}
+

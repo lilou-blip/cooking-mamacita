@@ -1,0 +1,166 @@
+.pantry-room {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+}
+
+.pantry-room__back {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  background: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 8px 18px;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--color-groseille-deep);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+.pantry-room__back:hover {
+  background: var(--color-blush);
+}
+
+.pantry-room__top-actions {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  gap: 10px;
+}
+
+.pantry-room__action {
+  background: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 8px 18px;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--color-groseille-deep);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  white-space: nowrap;
+}
+.pantry-room__action:hover {
+  background: var(--color-blush);
+}
+
+.pantry-room__title {
+  position: absolute;
+  top: 17%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-title);
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  color: var(--color-groseille);
+  -webkit-text-stroke: 6px var(--color-cream);
+  paint-order: stroke fill;
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pantry-room__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 1.5%;
+  padding: 0 2%;
+}
+
+.pantry-room__unit {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 90px;
+  max-width: 320px;
+}
+
+.pantry-room__unit-main {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.pantry-room__unit-main:hover {
+  transform: translateY(-6px);
+}
+
+.pantry-room__unit-delete {
+  position: absolute;
+  top: -6px;
+  right: 6%;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-white);
+  border: none;
+  color: var(--color-groseille-deep);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  z-index: 2;
+}
+.pantry-room__unit-delete:hover {
+  background: var(--color-groseille);
+  color: var(--color-white);
+}
+
+.pantry-room__unit-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(4px 10px 10px rgba(0, 0, 0, 0.25));
+}
+
+.pantry-room__unit-fallback {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.78);
+  border: 3px dashed var(--color-blush-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  color: var(--color-groseille-deep);
+  text-align: center;
+  padding: 12px;
+}
+
+.pantry-room__form-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(74, 59, 50, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .pantry-room__title {
+    font-size: clamp(1.8rem, 8vw, 2.4rem);
+    -webkit-text-stroke: 4px var(--color-cream);
+  }
+}

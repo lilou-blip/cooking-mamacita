@@ -1,0 +1,113 @@
+.toc-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.toc-page__title {
+  font-family: var(--font-title);
+  font-size: 2.2rem;
+  color: var(--color-groseille-deep);
+  text-align: center;
+  margin: 0 0 16px;
+}
+
+.toc-page__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.toc-page__controls input {
+  flex: 1;
+  min-width: 110px;
+}
+.toc-page__filters-toggle {
+  background: var(--color-white);
+  border: 1.5px solid var(--color-blush-deep);
+  color: var(--color-groseille-deep);
+  border-radius: var(--radius-tag);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toc-page__filters-toggle:hover {
+  background: var(--color-blush);
+}
+
+.toc-page__filters {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.toc-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.toc-page__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-white);
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: var(--shadow-card);
+}
+.toc-page__item:hover {
+  background: var(--color-cream);
+}
+.toc-page__item--active {
+  background: var(--color-blush);
+}
+.toc-page__item-number {
+  font-family: var(--font-title);
+  color: var(--color-groseille);
+  font-weight: 700;
+  min-width: 18px;
+}
+.toc-page__item-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-ink);
+}
+.toc-page__item-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.toc-page__empty {
+  color: var(--color-ink-soft);
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.toc-page__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.toc-page__actions button {
+  flex: 1;
+}

@@ -1,0 +1,57 @@
+.ingredient-autocomplete {
+  position: relative;
+  width: 100%;
+}
+.ingredient-autocomplete input {
+  width: 100%;
+}
+
+.ingredient-autocomplete__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--color-white);
+  border-radius: 12px;
+  box-shadow: var(--shadow-page);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  margin: 0;
+  list-style: none;
+}
+
+.ingredient-autocomplete__item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--color-ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.ingredient-autocomplete__item:hover,
+.ingredient-autocomplete__item--active {
+  background: var(--color-blush);
+}
+
+.ingredient-autocomplete__item-category {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-ink-soft);
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

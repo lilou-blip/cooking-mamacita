@@ -1,0 +1,116 @@
+.weekly-grid-scroll {
+  overflow-x: auto;
+  margin-bottom: 22px;
+  padding-bottom: 4px;
+}
+
+.weekly-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(7, minmax(120px, 1fr));
+  gap: 6px;
+  min-width: 900px;
+}
+
+.weekly-grid__corner {
+  background: transparent;
+}
+
+.weekly-grid__day-label,
+.weekly-grid__slot-label {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  color: var(--color-groseille-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+.weekly-grid__slot-label {
+  justify-content: flex-start;
+  font-size: 0.95rem;
+}
+
+.weekly-grid__cell {
+  background: var(--color-white);
+  border-radius: 10px;
+  min-height: 62px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: stretch;
+}
+
+.weekly-grid__add {
+  flex: 1;
+  background: none;
+  border: 2px dashed var(--color-blush-deep);
+  border-radius: 10px;
+  color: var(--color-blush-deep);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.weekly-grid__add:hover {
+  background: var(--color-cream);
+  color: var(--color-groseille-deep);
+}
+
+.weekly-grid__entry {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+  gap: 6px;
+}
+.weekly-grid__entry span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+.weekly-grid__entry--made span {
+  text-decoration: line-through;
+  color: var(--color-ink-soft);
+}
+.weekly-grid__entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.weekly-grid__entry-actions input[type="checkbox"] {
+  accent-color: var(--color-groseille);
+}
+.weekly-grid__entry-actions button {
+  background: none;
+  border: none;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.weekly-grid__entry-actions button:hover {
+  color: var(--color-groseille);
+}
+
+.weekly-grid__picker {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+.weekly-grid__picker select,
+.weekly-grid__picker input {
+  font-size: 0.78rem;
+  padding: 4px 6px;
+}
+.weekly-grid__servings {
+  width: 100%;
+}
+.weekly-grid__picker-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.weekly-grid__picker-actions button {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+}

@@ -1,0 +1,73 @@
+.week-summary {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  border-top: 6px solid var(--color-autumn-orange);
+  margin-bottom: 24px;
+}
+
+.week-summary--empty {
+  text-align: center;
+}
+.week-summary--empty p {
+  color: var(--color-ink-soft);
+  margin: 4px 0 14px;
+}
+
+.week-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.week-summary h2 {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  color: var(--color-groseille-deep);
+  margin: 0;
+}
+
+.week-summary__open {
+  background: none;
+  border: none;
+  color: var(--color-groseille-deep);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+}
+.week-summary__open:hover {
+  color: var(--color-groseille);
+  text-decoration: underline;
+}
+
+.week-summary__empty {
+  color: var(--color-ink-soft);
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+}
+
+.week-summary__days {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.week-summary__days li {
+  display: flex;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+.week-summary__day-label {
+  flex-shrink: 0;
+  width: 84px;
+  font-weight: 800;
+  color: var(--color-groseille-deep);
+}
+.week-summary__day-recipes {
+  color: var(--color-ink);
+}
