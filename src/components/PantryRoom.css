@@ -192,9 +192,57 @@
   overflow-y: auto;
 }
 
+/* Comme HomeTable : la mise en scène "meubles posés au sol" suppose un écran large (flex-wrap: nowrap +
+   min-width par meuble). En dessous de 640px on bascule sur une grille qui s'enroule et défile verticalement. */
 @media (max-width: 640px) {
+  .pantry-room {
+    position: static;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .pantry-room__back {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+  }
+
+  .pantry-room__top-actions {
+    position: static;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 0 16px 10px;
+  }
+
+  .pantry-room__vide-frigo-error {
+    position: static;
+    max-width: none;
+    text-align: center;
+    margin: 0 16px 10px;
+  }
+
+  /* Vient en premier dans le flux (le bouton retour est passé en `fixed` juste au-dessus) : c'est donc lui
+     qui doit dégager la place sous le bouton retour, pas .pantry-room__top-actions qui le suit. */
   .pantry-room__title {
+    position: static;
+    transform: none;
+    text-align: center;
     font-size: clamp(1.8rem, 8vw, 2.4rem);
     -webkit-text-stroke: 4px var(--color-cream);
+    margin: 70px 0 16px;
+  }
+
+  .pantry-room__floor {
+    position: static;
+    flex-wrap: wrap;
+    gap: 20px 16px;
+    padding: 0 16px 40px;
+  }
+
+  .pantry-room__unit {
+    flex: 0 1 110px;
+    min-width: 90px;
+    max-width: 130px;
   }
 }

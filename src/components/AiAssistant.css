@@ -136,3 +136,20 @@
   opacity: 0.5;
   cursor: default;
 }
+
+@media (max-width: 640px) {
+  .ai-assistant {
+    right: 14px;
+    bottom: 14px;
+    gap: 8px;
+  }
+  .ai-assistant__toggle {
+    width: 68px;
+  }
+  .ai-assistant__panel {
+    width: calc(100vw - 24px);
+    max-width: none;
+    height: min(560px, calc(100vh - 90px));
+    max-height: calc(100vh - 90px);
+  }
+}

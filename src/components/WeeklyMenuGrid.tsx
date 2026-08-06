@@ -22,6 +22,9 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
   const [cell, setCell] = useState<{ day: number; slot: MealSlot } | null>(null);
   const [recipeId, setRecipeId] = useState("");
   const [servings, setServings] = useState("4");
+  // La grille 7 jours × repas suppose un écran large ; sur mobile (CSS ci-dessous) on n'affiche qu'un jour
+  // à la fois, choisi via ces onglets — le reste du balisage/des données ne change pas.
+  const [mobileDay, setMobileDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
 
   function cellEntry(day: number, slot: MealSlot): MenuRecipeRow | undefined {
     return menu.recipes.find((r) => r.day_of_week === day && r.meal_slot === slot);
@@ -42,10 +45,23 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
 
   return (
     <div className="weekly-grid-scroll">
+      <div className="weekly-grid__day-tabs">
+        {DAYS.map((day, i) => (
+          <button
+            key={day}
+            type="button"
+            className={`weekly-grid__day-tab${i === mobileDay ? " weekly-grid__day-tab--active" : ""}`}
+            onClick={() => setMobileDay(i)}
+          >
+            {day.slice(0, 3)}
+          </button>
+        ))}
+      </div>
+
       <div className="weekly-grid">
         <div className="weekly-grid__corner" />
-        {DAYS.map((day) => (
-          <div key={day} className="weekly-grid__day-label">
+        {DAYS.map((day, i) => (
+          <div key={day} className={`weekly-grid__day-label${i === mobileDay ? " weekly-grid__col--active" : ""}`}>
             {day}
           </div>
         ))}
@@ -57,7 +73,10 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
               const entry = cellEntry(day, slot.value);
               const isActive = cell?.day === day && cell?.slot === slot.value;
               return (
-                <div key={`${slot.value}-${day}`} className="weekly-grid__cell">
+                <div
+                  key={`${slot.value}-${day}`}
+                  className={`weekly-grid__cell${day === mobileDay ? " weekly-grid__col--active" : ""}`}
+                >
                   {!isActive &&
                     (entry ? (
                       <div className={`weekly-grid__entry${entry.made ? " weekly-grid__entry--made" : ""}`}>

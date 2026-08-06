@@ -24,7 +24,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        // Les illustrations (~7 Mo au total) ne sont PAS préchargées au premier lancement — seulement le
+        // code et les polices, pour que l'app démarre vite. Les images sont mises en cache à la demande au
+        // fur et à mesure qu'on visite les écrans (runtimeCaching ci-dessous), pas toutes d'un coup en fond.
+        globPatterns: ["**/*.{js,css,html,woff,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === "image",
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+        ],
       },
     }),
   ],

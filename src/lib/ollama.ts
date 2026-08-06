@@ -241,43 +241,50 @@ Réponds UNIQUEMENT avec un objet JSON valide : {"low": nombre, "high": nombre}
 
 export const PRICE_COMPARISON_RETAILERS = ["Carrefour", "E.Leclerc", "Auchan", "Intermarché", "Lidl", "Aldi"] as const;
 
-export interface RetailerPrice {
+export interface RetailerTotal {
   retailer: string;
-  price: number;
+  total: number;
 }
 
 /**
- * Comparateur de prix par enseigne. Il ne s'agit PAS de prix scrapés en temps réel sur les sites des enseignes
- * (trop fragile et à la limite de leurs conditions d'utilisation pour être fiable) mais d'une estimation
- * comparative par l'IA, qui reflète le positionnement prix connu de chaque enseigne (Lidl/Aldi moins chers que
- * Carrefour/Auchan sur beaucoup de produits, etc.) — utile pour se situer, pas pour un prix exact garanti.
+ * Comparateur de prix par enseigne, sur le total d'une liste de courses entière (pas produit par produit) —
+ * un seul appel IA pour toute la liste, plus rapide et plus pertinent que comparer article par article.
+ * Il ne s'agit PAS de prix scrapés en temps réel sur les sites des enseignes (trop fragile et à la limite de
+ * leurs conditions d'utilisation pour être fiable) mais d'une estimation comparative par l'IA, qui reflète le
+ * positionnement prix connu de chaque enseigne (Lidl/Aldi moins chers que Carrefour/Auchan en général, etc.).
  */
-export async function estimatePricesByRetailer(
-  ingredientName: string,
-  quantity: number | null,
-  unit: string | null,
-): Promise<RetailerPrice[]> {
-  const retailerList = PRICE_COMPARISON_RETAILERS.join(", ");
-  const systemPrompt = `Tu compares le prix approximatif d'un ingrédient de cuisine dans différentes enseignes de supermarché françaises, pour aider à savoir où c'est le moins cher.
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après, respectant exactement ce schéma :
-{"retailers": [{"name": string, "price": nombre}]}
-Donne une ligne pour CHACUNE de ces enseignes, dans cet ordre : ${retailerList}.
-"price" est un prix réaliste en euros pour la quantité demandée, qui reflète le positionnement tarifaire connu de chaque enseigne (les enseignes discount comme Lidl et Aldi sont en général moins chères, Carrefour/Auchan/E.Leclerc/Intermarché sont proches les uns des autres). Varie légèrement les prix entre enseignes plutôt que de mettre la même valeur partout.`;
+export async function estimateListTotalByRetailer(
+  items: { name: string; quantity: number | null; unit: string | null }[],
+): Promise<RetailerTotal[]> {
+  if (items.length === 0) return [];
 
-  const qtyText = quantity != null ? `${quantity}${unit ? " " + unit : ""} de ` : "";
-  const parsed = await callAiJson(systemPrompt, `${qtyText}${ingredientName}`, 300);
+  const retailerList = PRICE_COMPARISON_RETAILERS.join(", ");
+  const itemsText = items
+    .map((i) => `- ${i.quantity != null ? `${i.quantity}${i.unit ? " " + i.unit : ""} de ` : ""}${i.name}`)
+    .join("\n");
+
+  const systemPrompt = `Tu estimes le coût total d'une liste de courses complète dans différentes enseignes de supermarché françaises, pour aider à savoir où faire ses courses reviendrait le moins cher.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après, respectant exactement ce schéma :
+{"retailers": [{"name": string, "total": nombre}]}
+Donne une ligne pour CHACUNE de ces enseignes, dans cet ordre : ${retailerList}.
+"total" est le coût réaliste en euros de TOUTE la liste ci-dessous réunie, dans cette enseigne — pas un article isolé. Base-toi sur le positionnement tarifaire connu de chaque enseigne (les enseignes discount comme Lidl et Aldi reviennent en général moins cher sur un panier complet, Carrefour/Auchan/E.Leclerc/Intermarché sont proches les uns des autres). Varie les totaux entre enseignes plutôt que de mettre la même valeur partout.
+
+Liste de courses :
+${itemsText}`;
+
+  const parsed = await callAiJson(systemPrompt, "Calcule le total de cette liste pour chaque enseigne.", 300);
   const obj = (parsed ?? {}) as Record<string, unknown>;
   const rows = Array.isArray(obj.retailers) ? (obj.retailers as Record<string, unknown>[]) : [];
 
   const byName = new Map(
     rows
-      .filter((r) => r && typeof r.name === "string" && typeof r.price === "number" && r.price >= 0)
-      .map((r) => [String(r.name), r.price as number]),
+      .filter((r) => r && typeof r.name === "string" && typeof r.total === "number" && r.total >= 0)
+      .map((r) => [String(r.name), r.total as number]),
   );
 
   return PRICE_COMPARISON_RETAILERS.filter((name) => byName.has(name)).map((name) => ({
     retailer: name,
-    price: byName.get(name)!,
+    total: byName.get(name)!,
   }));
 }
 

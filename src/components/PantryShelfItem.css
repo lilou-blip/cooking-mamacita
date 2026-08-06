@@ -175,3 +175,19 @@
 .pantry-shelf-item__delete:hover {
   color: var(--color-groseille);
 }
+
+@media (max-width: 640px) {
+  /* Un popover de 240px centré sous le token peut sortir de l'écran près des bords sur mobile (pas moyen
+     de le recentrer en CSS pur sans connaître sa position réelle) : on le transforme en petite feuille
+     ancrée en bas de l'écran à la place, comme les autres modales de l'app (scanner, ticket...). */
+  .pantry-shelf-item__panel {
+    position: fixed;
+    top: auto;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    transform: none;
+    width: auto;
+    z-index: 50;
+  }
+}

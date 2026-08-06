@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import {
   countRecipeMade,
   deleteRecipe,
@@ -18,15 +18,18 @@ import { RecipePreviewPage } from "./components/RecipePreviewPage";
 import { RecipeIngredientsPage } from "./components/RecipeIngredientsPage";
 import { RecipeStepsPage } from "./components/RecipeStepsPage";
 import { RecipeForm } from "./components/RecipeForm";
-import { PantryRoom } from "./components/PantryRoom";
-import { Menus } from "./components/Menus";
-import { Stats } from "./components/Stats";
 import { HomeTable } from "./components/HomeTable";
 import { ImportRecipe } from "./components/ImportRecipe";
 import { AiAssistant } from "./components/AiAssistant";
-import { ShoppingLists } from "./components/ShoppingLists";
 import type { RecipeDraft } from "./lib/ollama";
 import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
+
+// Sections visitées occasionnellement : chargées à la demande plutôt que dans le bundle initial,
+// pour que le premier écran (la table, presque toujours la première chose vue) s'affiche plus vite.
+const PantryRoom = lazy(() => import("./components/PantryRoom").then((m) => ({ default: m.PantryRoom })));
+const Menus = lazy(() => import("./components/Menus").then((m) => ({ default: m.Menus })));
+const Stats = lazy(() => import("./components/Stats").then((m) => ({ default: m.Stats })));
+const ShoppingLists = lazy(() => import("./components/ShoppingLists").then((m) => ({ default: m.ShoppingLists })));
 
 type View = "toc" | "book" | "form" | "import";
 type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping";
@@ -362,13 +365,21 @@ function App({ onLogout }: AppProps) {
           onEnableNotifications={handleEnableNotifications}
         />
       ) : section === "pantry" ? (
-        <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
+        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+          <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
+        </Suspense>
       ) : section === "menus" ? (
-        <Menus onBack={() => setSection("table")} />
+        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+          <Menus onBack={() => setSection("table")} />
+        </Suspense>
       ) : section === "stats" ? (
-        <Stats onBack={() => setSection("table")} />
+        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+          <Stats onBack={() => setSection("table")} />
+        </Suspense>
       ) : section === "shopping" ? (
-        <ShoppingLists onBack={() => setSection("table")} />
+        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+          <ShoppingLists onBack={() => setSection("table")} />
+        </Suspense>
       ) : (
         renderCarnet()
       )}

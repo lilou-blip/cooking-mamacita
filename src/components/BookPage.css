@@ -251,3 +251,14 @@
   color: var(--color-ink-soft);
 }
 
+@media (max-width: 640px) {
+  .book-page__doodle {
+    width: 46px;
+  }
+  .book-page__page-actions {
+    top: 6px;
+    right: 6px;
+    gap: 4px;
+  }
+}
+

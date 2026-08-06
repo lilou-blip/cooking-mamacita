@@ -4,6 +4,10 @@
   padding-bottom: 4px;
 }
 
+.weekly-grid__day-tabs {
+  display: none; /* réactivé uniquement sous 640px, voir media query en bas du fichier */
+}
+
 .weekly-grid {
   display: grid;
   grid-template-columns: 90px repeat(7, minmax(150px, 1fr));
@@ -124,4 +128,56 @@
 .weekly-grid__picker-actions button {
   font-size: 0.82rem;
   padding: 6px 14px;
+}
+
+/* La grille 2D (7 jours × repas) tient sur un grand écran mais pas sur un téléphone : en dessous de 640px,
+   on n'affiche plus qu'une colonne de jour à la fois (choisie via les onglets ci-dessus), le reste du
+   balisage/de la logique ne change pas. */
+@media (max-width: 640px) {
+  .weekly-grid-scroll {
+    overflow-x: visible;
+  }
+
+  .weekly-grid__day-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .weekly-grid__day-tab {
+    background: var(--color-white);
+    border: none;
+    border-radius: var(--radius-tag);
+    padding: 6px 10px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--color-ink-soft);
+    cursor: pointer;
+    box-shadow: var(--shadow-card);
+  }
+  .weekly-grid__day-tab--active {
+    background: var(--color-groseille);
+    color: var(--color-white);
+  }
+
+  .weekly-grid {
+    grid-template-columns: 70px 1fr;
+    min-width: 0;
+  }
+
+  .weekly-grid__day-label,
+  .weekly-grid__cell {
+    display: none;
+  }
+  .weekly-grid__day-label.weekly-grid__col--active {
+    display: flex;
+  }
+  .weekly-grid__cell.weekly-grid__col--active {
+    display: flex;
+  }
+
+  .weekly-grid__picker {
+    width: min(240px, calc(100vw - 100px));
+  }
 }

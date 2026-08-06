@@ -147,3 +147,19 @@
 .profile-bar__delete:hover {
   color: var(--color-groseille);
 }
+
+@media (max-width: 640px) {
+  .profile-bar__form {
+    flex-wrap: wrap;
+    width: 100%;
+    padding: 8px;
+  }
+  .profile-bar__name,
+  .profile-bar__dietary-notes {
+    width: auto;
+    flex: 1 1 100px;
+  }
+  .profile-bar__avatars {
+    flex-wrap: wrap;
+  }
+}

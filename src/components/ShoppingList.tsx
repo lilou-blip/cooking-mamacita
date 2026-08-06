@@ -12,7 +12,7 @@ import {
   type StorageUnit,
   type Unit,
 } from "../lib/db";
-import { estimatePriceRange, estimatePricesByRetailer, type RetailerPrice } from "../lib/ollama";
+import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/ollama";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import "./BookPage.css";
@@ -34,9 +34,9 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   const [estimatingId, setEstimatingId] = useState<number | null>(null);
   const [estimatingAll, setEstimatingAll] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
-  const [comparingId, setComparingId] = useState<number | null>(null);
-  const [comparisonLoading, setComparisonLoading] = useState<number | null>(null);
-  const [comparisons, setComparisons] = useState<Record<number, RetailerPrice[]>>({});
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparison, setComparison] = useState<RetailerTotal[] | null>(null);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
@@ -88,6 +88,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     await deleteShoppingListItem(item.id);
     setTransferringId(null);
     setTransferExpiry("");
+    invalidateComparison();
     await refresh();
   }
 
@@ -99,7 +100,13 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   async function handleDeleteItem(itemId: number) {
     await deleteShoppingListItem(itemId);
+    invalidateComparison();
     await refresh();
+  }
+
+  function invalidateComparison() {
+    setComparison(null);
+    setShowComparison(false);
   }
 
   async function estimateOne(itemId: number, name: string, quantity: number | null, unit: string | null) {
@@ -121,22 +128,25 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     }
   }
 
-  async function handleCompare(item: ShoppingListItem) {
-    if (comparingId === item.id) {
-      setComparingId(null);
+  async function handleCompareTotal() {
+    if (!list) return;
+    if (showComparison) {
+      setShowComparison(false);
       return;
     }
-    setComparingId(item.id);
-    if (comparisons[item.id]) return;
-    setComparisonLoading(item.id);
+    setShowComparison(true);
+    if (comparison) return;
+    setComparisonLoading(true);
     setComparisonError(null);
     try {
-      const rows = await estimatePricesByRetailer(item.ingredient_name, item.quantity, item.unit_abbreviation);
-      setComparisons((prev) => ({ ...prev, [item.id]: rows }));
+      const rows = await estimateListTotalByRetailer(
+        list.items.map((i) => ({ name: i.ingredient_name, quantity: i.quantity, unit: i.unit_abbreviation })),
+      );
+      setComparison(rows);
     } catch (err) {
       setComparisonError(err instanceof Error ? err.message : String(err));
     } finally {
-      setComparisonLoading(null);
+      setComparisonLoading(false);
     }
   }
 
@@ -167,6 +177,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     setNewName("");
     setNewQuantity("");
     setNewUnitAbbr("");
+    invalidateComparison();
     const fresh = await refresh();
     if (fresh) await estimateMissing(fresh.items);
   }
@@ -231,84 +242,53 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id || comparingId === item.id ? " shopping-list__item--expanded" : ""}`}
+                className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--expanded" : ""}`}
               >
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  onChange={(e) => toggleChecked(item.id, e.target.checked)}
-                />
-                <span className="shopping-list__qty">
-                  {item.quantity != null
-                    ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
-                    : ""}
-                </span>
-                <span className="shopping-list__name">{item.ingredient_name}</span>
-                {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
-                {item.price == null && !estimatingAll && (
+                <div className="shopping-list__item-main">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={(e) => toggleChecked(item.id, e.target.checked)}
+                  />
+                  <span className="shopping-list__qty">
+                    {item.quantity != null
+                      ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
+                      : ""}
+                  </span>
+                  <span className="shopping-list__name">{item.ingredient_name}</span>
+                  {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
+                </div>
+                <div className="shopping-list__item-controls">
+                  {item.price == null && !estimatingAll && (
+                    <button
+                      type="button"
+                      className="shopping-list__estimate"
+                      onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
+                      disabled={estimatingId === item.id || estimatingAll}
+                    >
+                      {estimatingId === item.id ? "..." : "💡 Estimer"}
+                    </button>
+                  )}
+                  {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
+                  <input
+                    key={`${item.id}-${item.price ?? "empty"}`}
+                    className="shopping-list__price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="€"
+                    defaultValue={item.price ?? ""}
+                    onBlur={(e) => setPrice(item.id, e.target.value)}
+                  />
                   <button
                     type="button"
-                    className="shopping-list__estimate"
-                    onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
-                    disabled={estimatingId === item.id || estimatingAll}
+                    className="shopping-list__delete"
+                    onClick={() => handleDeleteItem(item.id)}
+                    aria-label="Retirer"
                   >
-                    {estimatingId === item.id ? "..." : "💡 Estimer"}
+                    ×
                   </button>
-                )}
-                {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
-                <button
-                  type="button"
-                  className="shopping-list__estimate"
-                  onClick={() => handleCompare(item)}
-                  disabled={comparisonLoading === item.id}
-                >
-                  {comparisonLoading === item.id ? "..." : "🏷️ Comparer"}
-                </button>
-                <input
-                  key={`${item.id}-${item.price ?? "empty"}`}
-                  className="shopping-list__price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="€"
-                  defaultValue={item.price ?? ""}
-                  onBlur={(e) => setPrice(item.id, e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="shopping-list__delete"
-                  onClick={() => handleDeleteItem(item.id)}
-                  aria-label="Retirer"
-                >
-                  ×
-                </button>
-
-                {comparingId === item.id && (
-                  <div className="shopping-list__comparison">
-                    <p className="shopping-list__comparison-note">
-                      Estimation comparative par IA (pas des prix scrapés en temps réel) — pour se situer entre
-                      enseignes, pas un prix garanti.
-                    </p>
-                    {comparisonError && <p className="form-error">{comparisonError}</p>}
-                    {comparisons[item.id] && (
-                      <ul className="shopping-list__comparison-list">
-                        {(() => {
-                          const rows = comparisons[item.id];
-                          const min = Math.min(...rows.map((r) => r.price));
-                          return rows.map((r) => (
-                            <li
-                              key={r.retailer}
-                              className={r.price === min ? "shopping-list__comparison-row--cheapest" : undefined}
-                            >
-                              <span>{r.retailer}</span>
-                              <strong>{r.price.toFixed(2)} €</strong>
-                            </li>
-                          ));
-                        })()}
-                      </ul>
-                    )}
-                  </div>
-                )}
+                </div>
 
                 {transferringId === item.id && (
                   <div className="shopping-list__transfer">
@@ -387,7 +367,38 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
               </button>
             </>
           )}
+          <button
+            type="button"
+            className="shopping-list__estimate-all"
+            onClick={handleCompareTotal}
+            disabled={comparisonLoading}
+          >
+            {comparisonLoading ? "Comparaison..." : "🏷️ Comparer les enseignes"}
+          </button>
         </div>
+
+        {showComparison && (
+          <div className="shopping-list__comparison">
+            <p className="shopping-list__comparison-note">
+              Estimation comparative par IA du total de la liste (pas des prix scrapés en temps réel) — pour se
+              situer entre enseignes, pas un prix garanti.
+            </p>
+            {comparisonError && <p className="form-error">{comparisonError}</p>}
+            {comparison && (
+              <ul className="shopping-list__comparison-list">
+                {(() => {
+                  const min = Math.min(...comparison.map((r) => r.total));
+                  return comparison.map((r) => (
+                    <li key={r.retailer} className={r.total === min ? "shopping-list__comparison-row--cheapest" : undefined}>
+                      <span>{r.retailer}</span>
+                      <strong>{r.total.toFixed(2)} €</strong>
+                    </li>
+                  ));
+                })()}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

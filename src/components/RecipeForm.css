@@ -169,3 +169,38 @@ textarea {
   background: var(--color-cream);
 }
 
+@media (max-width: 640px) {
+  .field-row {
+    flex-wrap: wrap;
+  }
+  .field-row .field {
+    flex: 1 1 140px;
+  }
+
+  .ingredient-row {
+    grid-template-columns: 70px 90px 1fr;
+    grid-template-areas:
+      "qty unit remove"
+      "name name name"
+      "category category category";
+    gap: 6px 8px;
+    margin-bottom: 14px;
+  }
+  .ingredient-row__quantity {
+    grid-area: qty;
+  }
+  .ingredient-row__unit {
+    grid-area: unit;
+  }
+  .ingredient-row__name {
+    grid-area: name;
+  }
+  .ingredient-row__category {
+    grid-area: category;
+  }
+  .ingredient-row .row-remove {
+    grid-area: remove;
+    justify-self: end;
+  }
+}
+
