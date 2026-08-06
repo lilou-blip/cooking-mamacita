@@ -5,13 +5,22 @@ import "./ProfileBar.css";
 
 interface ProfileBarProps {
   profiles: Profile[];
-  onAdd: (name: string, color: string, avatar: string | null, dietaryNotes: string | null) => Promise<void> | void;
+  onAdd: (
+    name: string,
+    color: string,
+    avatar: string | null,
+    dietaryNotes: string | null,
+    age: number | null,
+    isGuest: boolean,
+  ) => Promise<void> | void;
   onUpdate?: (
     id: number,
     name: string,
     color: string,
     avatar: string | null,
     dietaryNotes: string | null,
+    age: number | null,
+    isGuest: boolean,
   ) => Promise<void> | void;
   onDelete?: (id: number) => Promise<void> | void;
   showChips?: boolean;
@@ -27,6 +36,8 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [dietaryNotes, setDietaryNotes] = useState("");
+  const [age, setAge] = useState("");
+  const [isGuest, setIsGuest] = useState(false);
   const avatarOptions = listAvatarOptions();
 
   function startAdd() {
@@ -34,6 +45,8 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
     setColor(DEFAULT_COLOR);
     setAvatar(null);
     setDietaryNotes("");
+    setAge("");
+    setIsGuest(false);
     setMode({ kind: "add" });
   }
 
@@ -42,6 +55,8 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
     setColor(p.color);
     setAvatar(p.avatar);
     setDietaryNotes(p.dietary_notes ?? "");
+    setAge(p.age != null ? String(p.age) : "");
+    setIsGuest(p.is_guest);
     setMode({ kind: "edit", id: p.id });
   }
 
@@ -49,10 +64,11 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
     e.preventDefault();
     if (!name.trim()) return;
     const notes = dietaryNotes.trim() || null;
+    const ageValue = age.trim() ? Number(age) : null;
     if (mode.kind === "edit") {
-      await onUpdate?.(mode.id, name.trim(), color, avatar, notes);
+      await onUpdate?.(mode.id, name.trim(), color, avatar, notes, ageValue, isGuest);
     } else {
-      await onAdd(name.trim(), color, avatar, notes);
+      await onAdd(name.trim(), color, avatar, notes, ageValue, isGuest);
     }
     setMode({ kind: "none" });
   }
@@ -132,6 +148,19 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
             onChange={(e) => setDietaryNotes(e.target.value)}
             className="profile-bar__dietary-notes"
           />
+          <input
+            type="number"
+            min="0"
+            max="130"
+            placeholder="Âge"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            className="profile-bar__age"
+          />
+          <label className="profile-bar__guest">
+            <input type="checkbox" checked={isGuest} onChange={(e) => setIsGuest(e.target.checked)} />
+            Invité (exclu des stats "Tous")
+          </label>
           <button type="submit" className="profile-bar__ok">
             OK
           </button>

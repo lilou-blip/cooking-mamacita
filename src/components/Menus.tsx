@@ -20,6 +20,7 @@ import { ShoppingList } from "./ShoppingList";
 import { WeeklyMenuGrid } from "./WeeklyMenuGrid";
 import { MenuSuggestions } from "./MenuSuggestions";
 import { WeekSummary } from "./WeekSummary";
+import { LoadingScreen } from "./LoadingScreen";
 import "./Menus.css";
 
 type SubView = "list" | "detail";
@@ -112,7 +113,7 @@ export function Menus({ onBack }: MenusProps) {
     return <ShoppingList id={shoppingListId} onBack={() => setShoppingListId(null)} />;
   }
 
-  if (loading) return <p className="status-text">Chargement des menus...</p>;
+  if (loading) return <LoadingScreen message="Chargement des menus..." />;
 
   if (subView === "detail" && currentMenu) {
     const madeCount = currentMenu.recipes.filter((r) => r.made).length;
@@ -162,7 +163,7 @@ export function Menus({ onBack }: MenusProps) {
               />
             ) : (
               <button className="menu-detail__suggest" onClick={() => setShowSuggestions(true)}>
-                💡 Suggestions IA
+                💡 Suggestions de Mamacita
               </button>
             )}
 

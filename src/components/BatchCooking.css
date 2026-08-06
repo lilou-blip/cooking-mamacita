@@ -1,0 +1,125 @@
+.batch-cooking {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(16px, 4vh, 32px) 20px;
+  overflow: auto;
+}
+.batch-cooking .book-nav__back {
+  display: block;
+  flex-shrink: 0;
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.batch-cooking__paper {
+  flex: 1;
+  max-width: 700px;
+  width: 100%;
+  margin: 10px auto 0;
+  background: var(--color-cream);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 24px 24px;
+}
+
+.batch-cooking__paper h1 {
+  font-family: var(--font-title);
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  color: var(--color-groseille-deep);
+  margin: 10px 0 12px;
+  text-align: center;
+}
+
+.batch-cooking__hint {
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 14px;
+}
+
+.batch-cooking__empty {
+  text-align: center;
+  color: var(--color-ink-soft);
+}
+
+.batch-cooking__search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.batch-cooking__list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.batch-cooking__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-white);
+  border-radius: var(--radius-tag);
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.batch-cooking__item-title {
+  flex: 1 1 140px;
+  font-weight: 700;
+}
+.batch-cooking__item-servings {
+  font-size: 0.76rem;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.batch-cooking__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  align-items: center;
+}
+
+.batch-cooking__distribute-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.batch-cooking__distribute-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 10px 12px;
+}
+.batch-cooking__distribute-title {
+  flex: 1 1 100%;
+  font-weight: 700;
+  color: var(--color-groseille-deep);
+}
+.batch-cooking__distribute-row input[type="number"] {
+  width: 70px;
+}
+.batch-cooking__distribute-unit {
+  font-size: 0.78rem;
+  color: var(--color-ink-soft);
+}
+.batch-cooking__distribute-row select {
+  flex: 1 1 130px;
+}
+.batch-cooking__distribute-row input[type="date"] {
+  flex: 1 1 140px;
+}

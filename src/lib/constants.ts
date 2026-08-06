@@ -16,6 +16,8 @@ export const INGREDIENT_CATEGORIES: { value: string; label: string }[] = [
   { value: "proteines", label: "Protéines" },
   { value: "feculents", label: "Féculents" },
   { value: "laitages", label: "Laitages" },
+  { value: "matieres_grasses", label: "Matières grasses" },
+  { value: "sucreries", label: "Sucres & sucreries" },
   { value: "epicerie", label: "Épicerie" },
   { value: "boissons", label: "Boissons" },
   { value: "autre", label: "Autre" },

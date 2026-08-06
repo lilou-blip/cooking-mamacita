@@ -18,9 +18,11 @@ import {
 } from "../lib/db";
 import { estimatePriceRange } from "../lib/ollama";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
+import { guidelineForAge } from "../lib/nutritionGuidelines";
 import { getAvatarUrl } from "../lib/avatarIllustrations";
 import { BarChart } from "./BarChart";
 import { ProfileBar } from "./ProfileBar";
+import { LoadingScreen } from "./LoadingScreen";
 import "./Stats.css";
 
 const CATEGORY_LABEL_BY_VALUE = Object.fromEntries(INGREDIENT_CATEGORIES.map((c) => [c.value, c.label]));
@@ -92,8 +94,15 @@ export function Stats({ onBack }: StatsProps) {
     setLoading(false);
   }
 
-  async function handleAddProfile(name: string, color: string, avatar: string | null, dietaryNotes: string | null) {
-    await createProfile({ name, color, avatar, dietary_notes: dietaryNotes });
+  async function handleAddProfile(
+    name: string,
+    color: string,
+    avatar: string | null,
+    dietaryNotes: string | null,
+    age: number | null,
+    isGuest: boolean,
+  ) {
+    await createProfile({ name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
     setProfiles(await listProfiles());
   }
 
@@ -103,9 +112,12 @@ export function Stats({ onBack }: StatsProps) {
     color: string,
     avatar: string | null,
     dietaryNotes: string | null,
+    age: number | null,
+    isGuest: boolean,
   ) {
-    await updateProfile(id, { name, color, avatar, dietary_notes: dietaryNotes });
+    await updateProfile(id, { name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
     setProfiles(await listProfiles());
+    await refresh(selectedProfileId);
   }
 
   async function handleDeleteProfile(id: number) {
@@ -118,10 +130,13 @@ export function Stats({ onBack }: StatsProps) {
     }
   }
 
-  if (loading) return <p className="status-text">Chargement des statistiques...</p>;
+  if (loading) return <LoadingScreen message="Calcul des statistiques..." />;
 
   const hasAnyData =
     topRecipes.length > 0 || byCategory.length > 0 || byProfile.length > 0 || wasteItems.length > 0 || budgetTrend.length > 0;
+
+  const selectedProfile = selectedProfileId != null ? profiles.find((p) => p.id === selectedProfileId) : null;
+  const selectedGuideline = selectedProfile?.age != null ? guidelineForAge(selectedProfile.age) : null;
 
   return (
     <div className="stats">
@@ -204,6 +219,21 @@ export function Stats({ onBack }: StatsProps) {
               <p className="stats__empty">Pas encore assez de données.</p>
             )}
           </section>
+
+          {selectedGuideline && (
+            <section className="stats__section">
+              <h2>Repères nutrition — {selectedGuideline.label}</h2>
+              <p className="stats__guideline-disclaimer">
+                Indications générales grand public (type PNNS/"Manger Bouger"), pas un avis médical personnalisé —
+                à comparer à l'oeil avec la répartition par catégorie ci-dessus, pas un calcul exact.
+              </p>
+              <ul className="stats__guideline-list">
+                {selectedGuideline.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {selectedProfileId === null && (
             <section className="stats__section">

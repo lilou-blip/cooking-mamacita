@@ -88,6 +88,25 @@
   width: 170px;
 }
 
+.profile-bar__age {
+  border: none;
+  background: var(--color-cream);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  width: 56px;
+}
+
+.profile-bar__guest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
 .profile-bar__avatars {
   display: flex;
   gap: 4px;
@@ -158,6 +177,10 @@
   .profile-bar__dietary-notes {
     width: auto;
     flex: 1 1 100px;
+  }
+  .profile-bar__age {
+    width: auto;
+    flex: 0 1 60px;
   }
   .profile-bar__avatars {
     flex-wrap: wrap;

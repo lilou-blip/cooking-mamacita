@@ -7,6 +7,7 @@ import {
   type ShoppingListSummary,
 } from "../lib/db";
 import { ShoppingList } from "./ShoppingList";
+import { LoadingScreen } from "./LoadingScreen";
 import "./ShoppingLists.css";
 
 interface ShoppingListsProps {
@@ -65,7 +66,7 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
         <h1>Mes listes de courses</h1>
 
         {loading ? (
-          <p className="status-text">Chargement...</p>
+          <LoadingScreen fullScreen={false} />
         ) : lists.length === 0 ? (
           <p className="shopping-lists__empty">Aucune liste pour l'instant, crées-en une ci-dessous.</p>
         ) : (

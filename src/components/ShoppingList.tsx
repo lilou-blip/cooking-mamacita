@@ -15,6 +15,7 @@ import {
 import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/ollama";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
+import { LoadingScreen } from "./LoadingScreen";
 import "./BookPage.css";
 import "./ShoppingList.css";
 
@@ -210,7 +211,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (loading || !list) return <p className="status-text">Chargement de la liste...</p>;
+  if (loading || !list) return <LoadingScreen message="Chargement de la liste..." />;
 
   const total = list.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   const missingPriceCount = list.items.filter((i) => i.price == null).length;
@@ -380,8 +381,8 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
         {showComparison && (
           <div className="shopping-list__comparison">
             <p className="shopping-list__comparison-note">
-              Estimation comparative par IA du total de la liste (pas des prix scrapés en temps réel) — pour se
-              situer entre enseignes, pas un prix garanti.
+              Estimation comparative de Mamacita sur le total de la liste (pas des prix scrapés en temps réel) —
+              pour se situer entre enseignes, pas un prix garanti.
             </p>
             {comparisonError && <p className="form-error">{comparisonError}</p>}
             {comparison && (

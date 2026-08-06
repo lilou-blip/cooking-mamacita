@@ -6,6 +6,9 @@ import pantryBackground from "../assets/illustrations/pantry-background.png";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
 import { ReceiptScanner } from "./ReceiptScanner";
+import { BatchCooking } from "./BatchCooking";
+import { useIsMobile } from "../lib/useIsMobile";
+import { LoadingScreen } from "./LoadingScreen";
 import "./PantryRoom.css";
 
 interface PantryRoomProps {
@@ -27,6 +30,7 @@ function worstStatus(items: PantryItem[], unitId: number): UnitStatus {
 }
 
 export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
+  const isMobile = useIsMobile(640); // le scan de ticket suppose un appareil photo à portée de main
   const [units, setUnits] = useState<StorageUnit[]>([]);
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +39,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const [videFrigoLoading, setVideFrigoLoading] = useState(false);
   const [videFrigoError, setVideFrigoError] = useState<string | null>(null);
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
+  const [showBatchCooking, setShowBatchCooking] = useState(false);
 
   const refresh = useCallback(async () => {
     const [unitList, itemList] = await Promise.all([listStorageUnits(), listPantryItems()]);
@@ -115,7 +120,19 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
     );
   }
 
-  if (loading) return <p className="status-text">Chargement du garde-manger...</p>;
+  if (showBatchCooking) {
+    return (
+      <BatchCooking
+        onBack={() => setShowBatchCooking(false)}
+        onDone={() => {
+          setShowBatchCooking(false);
+          refresh();
+        }}
+      />
+    );
+  }
+
+  if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
 
   return (
     <div className="pantry-room" style={{ backgroundImage: `url(${pantryBackground})` }}>
@@ -134,11 +151,16 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
           + Ajouter un meuble
         </button>
         <button className="pantry-room__action" onClick={handleVideFrigo} disabled={videFrigoLoading}>
-          {videFrigoLoading ? "L'IA réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
+          {videFrigoLoading ? "Mamacita réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
         </button>
-        <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>
-          📸 Scanner un ticket
+        <button className="pantry-room__action" onClick={() => setShowBatchCooking(true)}>
+          🍲 Batch cooking
         </button>
+        {isMobile && (
+          <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>
+            📸 Scanner un ticket
+          </button>
+        )}
       </div>
       {videFrigoError && <p className="pantry-room__vide-frigo-error">{videFrigoError}</p>}
 

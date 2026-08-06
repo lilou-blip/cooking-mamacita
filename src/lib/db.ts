@@ -322,11 +322,16 @@ export interface Profile {
   relation: string | null;
   avatar: string | null;
   dietary_notes: string | null;
+  age: number | null;
+  is_guest: boolean;
 }
 
 export async function listProfiles(): Promise<Profile[]> {
   return unwrap(
-    await supabase.from("consumer_profiles").select("id, name, color, relation, avatar, dietary_notes").order("created_at"),
+    await supabase
+      .from("consumer_profiles")
+      .select("id, name, color, relation, avatar, dietary_notes, age, is_guest")
+      .order("created_at"),
   );
 }
 
@@ -336,6 +341,8 @@ export async function createProfile(input: {
   relation?: string | null;
   avatar?: string | null;
   dietary_notes?: string | null;
+  age?: number | null;
+  is_guest?: boolean;
 }): Promise<number> {
   const inserted = unwrap<{ id: number }>(
     await supabase
@@ -346,6 +353,8 @@ export async function createProfile(input: {
         relation: input.relation ?? null,
         avatar: input.avatar ?? null,
         dietary_notes: input.dietary_notes ?? null,
+        age: input.age ?? null,
+        is_guest: input.is_guest ?? false,
       })
       .select("id")
       .single(),
@@ -355,7 +364,15 @@ export async function createProfile(input: {
 
 export async function updateProfile(
   id: number,
-  input: { name: string; color: string; relation?: string | null; avatar?: string | null; dietary_notes?: string | null },
+  input: {
+    name: string;
+    color: string;
+    relation?: string | null;
+    avatar?: string | null;
+    dietary_notes?: string | null;
+    age?: number | null;
+    is_guest?: boolean;
+  },
 ): Promise<void> {
   unwrap(
     await supabase
@@ -366,6 +383,8 @@ export async function updateProfile(
         relation: input.relation ?? null,
         avatar: input.avatar ?? null,
         dietary_notes: input.dietary_notes ?? null,
+        age: input.age ?? null,
+        is_guest: input.is_guest ?? false,
       })
       .eq("id", id),
   );
@@ -429,6 +448,8 @@ export interface PantryItem {
   expires_at: string | null;
   storage_unit_id: number | null;
   storage_unit_name: string | null;
+  recipe_id: number | null;
+  recipe_title: string | null;
   assignments: PantryAssignment[];
 }
 
@@ -442,15 +463,17 @@ export async function listPantryItems(): Promise<PantryItem[]> {
       added_at: string;
       expires_at: string | null;
       storage_unit_id: number | null;
+      recipe_id: number | null;
       ingredients: { name: string; category: string } | null;
       units: { name: string; abbreviation: string } | null;
       storage_units: { name: string } | null;
+      recipes: { title: string } | null;
     }[]
   >(
     (await supabase
       .from("pantry_items")
       .select(
-        "id, ingredient_id, unit_id, quantity, added_at, expires_at, storage_unit_id, ingredients(name, category), units(name, abbreviation), storage_units(name)",
+        "id, ingredient_id, unit_id, quantity, added_at, expires_at, storage_unit_id, recipe_id, ingredients(name, category), units(name, abbreviation), storage_units(name), recipes(title)",
       )
       .order("expires_at", { ascending: true, nullsFirst: false })
       .order("name", { foreignTable: "ingredients", ascending: true })) as never,
@@ -469,6 +492,8 @@ export async function listPantryItems(): Promise<PantryItem[]> {
     expires_at: r.expires_at,
     storage_unit_id: r.storage_unit_id,
     storage_unit_name: r.storage_units?.name ?? null,
+    recipe_id: r.recipe_id,
+    recipe_title: r.recipes?.title ?? null,
   }));
   if (items.length === 0) return [];
 
@@ -498,6 +523,9 @@ export interface NewPantryItem {
   unit_abbreviation: string | null;
   expires_at?: string | null;
   storage_unit_id?: number | null;
+  /** Renseigné pour un reste de batch cooking : `quantity` représente alors un nombre de portions de cette
+   * recette (pas un poids/volume), pour que les stats puissent redécomposer par catégorie plus tard. */
+  recipe_id?: number | null;
   assignments: { profile_id: number; quantity: number }[];
 }
 
@@ -514,6 +542,7 @@ export async function createPantryItem(input: NewPantryItem): Promise<number> {
         quantity: input.quantity,
         expires_at: input.expires_at ?? null,
         storage_unit_id: input.storage_unit_id ?? null,
+        recipe_id: input.recipe_id ?? null,
       })
       .select("id")
       .single(),
@@ -550,7 +579,7 @@ export async function adjustPantryItemQuantity(id: number, delta: number): Promi
 export async function consumePantryItem(id: number, quantityConsumed: number, profileId?: number | null): Promise<void> {
   const { data: item } = await supabase
     .from("pantry_items")
-    .select("quantity, ingredient_id, unit_id, expires_at")
+    .select("quantity, ingredient_id, unit_id, expires_at, recipe_id")
     .eq("id", id)
     .maybeSingle();
   if (!item) return;
@@ -567,6 +596,7 @@ export async function consumePantryItem(id: number, quantityConsumed: number, pr
     profile_id: profileId ?? null,
     quantity: quantityConsumed,
     unit_id: item.unit_id,
+    recipe_id: item.recipe_id ?? null,
   });
 
   // Aliment consommé alors qu'il était proche de la péremption (ou déjà périmé) : gaspillage évité, on le journalise pour les stats éco.
@@ -873,10 +903,10 @@ export async function deleteShoppingList(id: number): Promise<void> {
 const STAPLE_DEFAULTS: { name: string; category: string; quantity: number; unitAbbr: string | null }[] = [
   { name: "oeufs", category: "proteines", quantity: 6, unitAbbr: null },
   { name: "farine", category: "epicerie", quantity: 1, unitAbbr: "kg" },
-  { name: "sucre", category: "epicerie", quantity: 1, unitAbbr: "kg" },
-  { name: "huile", category: "epicerie", quantity: 1, unitAbbr: "l" },
+  { name: "sucre", category: "sucreries", quantity: 1, unitAbbr: "kg" },
+  { name: "huile", category: "matieres_grasses", quantity: 1, unitAbbr: "l" },
   { name: "lait", category: "laitages", quantity: 1, unitAbbr: "l" },
-  { name: "beurre", category: "laitages", quantity: 250, unitAbbr: "g" },
+  { name: "beurre", category: "matieres_grasses", quantity: 250, unitAbbr: "g" },
 ];
 
 export async function generateShoppingListForMenu(menuId: number): Promise<number> {
@@ -1180,49 +1210,137 @@ export interface CategoryStat {
   count: number;
 }
 
+/** Ingrédients (avec quantité) d'un ensemble de recettes, pour redécomposer une conso par catégorie. */
+async function loadRecipeIngredientProfiles(
+  recipeIds: number[],
+): Promise<Map<number, { baseServings: number; ingredients: { quantity: number | null; unit_id: number | null; category: string }[] }>> {
+  const [ingredientRows, recipeRows] = await Promise.all([
+    supabase
+      .from("recipe_ingredients")
+      .select("recipe_id, quantity, unit_id, ingredients(category)")
+      .in("recipe_id", recipeIds)
+      .then((r) => unwrap<{ recipe_id: number; quantity: number | null; unit_id: number | null; ingredients: { category: string } | null }[]>(r as never)),
+    supabase
+      .from("recipes")
+      .select("id, servings")
+      .in("id", recipeIds)
+      .then((r) => unwrap<{ id: number; servings: number }[]>(r)),
+  ]);
+
+  const result = new Map<number, { baseServings: number; ingredients: { quantity: number | null; unit_id: number | null; category: string }[] }>();
+  for (const recipe of recipeRows) result.set(recipe.id, { baseServings: recipe.servings, ingredients: [] });
+  for (const row of ingredientRows) {
+    if (!row.ingredients) continue;
+    const entry = result.get(row.recipe_id);
+    if (entry) entry.ingredients.push({ quantity: row.quantity, unit_id: row.unit_id, category: row.ingredients.category });
+  }
+  return result;
+}
+
 /**
- * Répartition (en nombre d'occurrences, pas en quantité — les unités ne sont pas comparables entre elles)
- * des catégories d'ingrédients consommés, via le garde-manger et les recettes faites.
+ * Répartition par catégorie, pondérée par quantité réelle (convertie en base g/ml, ~50g pour les
+ * ingrédients à la pièce faute de connaître leur poids exact) plutôt qu'un simple comptage d'occurrences
+ * — 10g de beurre ne doit pas peser autant que 1kg dans les stats.
+ *
+ * Quand profileId est omis (vue "Tous"), les consommations attribuées UNIQUEMENT à un profil marqué
+ * "invité" sont exclues : ce profil sert de fourre-tout pour les repas avec des invités et ne doit pas
+ * gonfler les stats du foyer. Sélectionner directement le profil invité, lui, montre bien ses données.
  */
 export async function getConsumptionByCategory(profileId?: number | null): Promise<CategoryStat[]> {
-  const counts = new Map<string, number>();
-  const add = (category: string) => counts.set(category, (counts.get(category) ?? 0) + 1);
+  const { unitTypeOf, toBase } = createUnitConverter(await listUnits());
+  const weights = new Map<string, number>();
+  const add = (category: string, quantity: number, unitId: number | null) => {
+    const base = toBase(quantity, unitId);
+    const weighted = unitTypeOf(unitId) === "piece" ? base * 50 : base;
+    weights.set(category, (weights.get(category) ?? 0) + weighted);
+  };
 
-  let pantryQuery = supabase.from("pantry_consumption_log").select("ingredients(category)");
+  let guestProfileIds = new Set<number>();
+  if (profileId == null) {
+    guestProfileIds = new Set((await listProfiles()).filter((p) => p.is_guest).map((p) => p.id));
+  }
+
+  // --- Garde-manger consommé directement (pas via une recette "faite") ---
+  let pantryQuery = supabase
+    .from("pantry_consumption_log")
+    .select("quantity, unit_id, profile_id, recipe_id, ingredients(category)");
   if (profileId != null) pantryQuery = pantryQuery.eq("profile_id", profileId);
-  const pantryRows = unwrap<{ ingredients: { category: string } | null }[]>(await (pantryQuery as never));
-  for (const row of pantryRows) if (row.ingredients) add(row.ingredients.category);
+  const pantryRows = unwrap<
+    { quantity: number; unit_id: number | null; profile_id: number | null; recipe_id: number | null; ingredients: { category: string } | null }[]
+  >(await (pantryQuery as never));
 
+  const directRows = pantryRows.filter((r) => r.recipe_id == null);
+  const dishRows = pantryRows.filter((r) => r.recipe_id != null);
+
+  for (const row of directRows) {
+    if (profileId == null && row.profile_id != null && guestProfileIds.has(row.profile_id)) continue;
+    if (row.ingredients) add(row.ingredients.category, row.quantity, row.unit_id);
+  }
+
+  // --- Restes de plats composites (batch cooking) : redécomposés via les ingrédients de la recette
+  //     d'origine, au prorata des portions réellement consommées (quantity = portions ici, pas un poids). ---
+  if (dishRows.length > 0) {
+    const dishRecipeIds = [...new Set(dishRows.map((r) => r.recipe_id!))];
+    const profiles = await loadRecipeIngredientProfiles(dishRecipeIds);
+    for (const row of dishRows) {
+      if (profileId == null && row.profile_id != null && guestProfileIds.has(row.profile_id)) continue;
+      const profile = profiles.get(row.recipe_id!);
+      if (!profile || profile.baseServings <= 0) continue;
+      const scale = row.quantity / profile.baseServings;
+      for (const ing of profile.ingredients) {
+        if (ing.quantity == null) continue;
+        add(ing.category, ing.quantity * scale, ing.unit_id);
+      }
+    }
+  }
+
+  // --- Recettes marquées "faites" ---
   let logIds: number[] | null = null;
+  let excludedLogIds = new Set<number>();
   if (profileId != null) {
     const rows = unwrap<{ consumption_log_id: number }[]>(
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
     logIds = rows.map((r) => r.consumption_log_id);
+  } else if (guestProfileIds.size > 0) {
+    // Exclut les repas attribués UNIQUEMENT à un profil invité (partagé avec au moins une personne du
+    // foyer, il reste compté normalement).
+    const attributions = unwrap<{ consumption_log_id: number; profile_id: number }[]>(
+      await supabase.from("consumption_log_profiles").select("consumption_log_id, profile_id"),
+    );
+    const profilesByLog = new Map<number, number[]>();
+    for (const a of attributions) {
+      const list = profilesByLog.get(a.consumption_log_id) ?? [];
+      list.push(a.profile_id);
+      profilesByLog.set(a.consumption_log_id, list);
+    }
+    for (const [logId, profIds] of profilesByLog.entries()) {
+      if (profIds.length > 0 && profIds.every((p) => guestProfileIds.has(p))) excludedLogIds.add(logId);
+    }
   }
 
-  let logQuery = supabase.from("consumption_log").select("id, recipe_id");
+  let logQuery = supabase.from("consumption_log").select("id, recipe_id, servings");
   if (logIds) logQuery = logQuery.in("id", logIds);
-  const logRows = unwrap<{ id: number; recipe_id: number }[]>(await logQuery);
+  const logRowsRaw = unwrap<{ id: number; recipe_id: number; servings: number }[]>(await logQuery);
+  const logRows = logRowsRaw.filter((r) => !excludedLogIds.has(r.id));
 
   if (logRows.length > 0) {
     const uniqueRecipeIds = [...new Set(logRows.map((r) => r.recipe_id))];
-    const ingredientRows = unwrap<{ recipe_id: number; ingredients: { category: string } | null }[]>(
-      (await supabase.from("recipe_ingredients").select("recipe_id, ingredients(category)").in("recipe_id", uniqueRecipeIds)) as never,
-    );
-    const categoriesByRecipe = new Map<number, string[]>();
-    for (const row of ingredientRows) {
-      if (!row.ingredients) continue;
-      const list = categoriesByRecipe.get(row.recipe_id) ?? [];
-      list.push(row.ingredients.category);
-      categoriesByRecipe.set(row.recipe_id, list);
-    }
+    const profiles = await loadRecipeIngredientProfiles(uniqueRecipeIds);
     for (const log of logRows) {
-      for (const category of categoriesByRecipe.get(log.recipe_id) ?? []) add(category);
+      const profile = profiles.get(log.recipe_id);
+      if (!profile) continue;
+      const scale = profile.baseServings > 0 ? log.servings / profile.baseServings : 1;
+      for (const ing of profile.ingredients) {
+        if (ing.quantity == null) continue;
+        add(ing.category, ing.quantity * scale, ing.unit_id);
+      }
     }
   }
 
-  return [...counts.entries()].map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
+  return [...weights.entries()]
+    .map(([category, weight]) => ({ category, count: Math.round(weight) }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export interface ProfileStat {

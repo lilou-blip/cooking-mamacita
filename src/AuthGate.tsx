@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { Login } from "./components/Login";
+import { LoadingScreen } from "./components/LoadingScreen";
 import App from "./App";
 
 export function AuthGate() {
@@ -19,7 +20,7 @@ export function AuthGate() {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  if (loading) return <p className="status-text">Chargement...</p>;
+  if (loading) return <LoadingScreen />;
   if (!session) return <Login />;
   return <App onLogout={() => supabase.auth.signOut()} />;
 }

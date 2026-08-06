@@ -12,6 +12,7 @@ import {
 } from "../lib/db";
 import { PantryForm } from "./PantryForm";
 import { PantryShelfItem } from "./PantryShelfItem";
+import { LoadingScreen } from "./LoadingScreen";
 import "./Pantry.css";
 
 interface PantryProps {
@@ -66,7 +67,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
     await refresh();
   }
 
-  if (loading) return <p className="status-text">Chargement du garde-manger...</p>;
+  if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
 
   const visibleItems = items.filter((item) => initialUnitId === null || item.storage_unit_id === initialUnitId);
 

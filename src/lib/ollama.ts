@@ -70,7 +70,12 @@ ${tagsByCategory}
 Choisis TOUJOURS au moins un tag de la catégorie "type" (entrée/plat/dessert/apéritif/boisson) qui correspond à la recette, plus les autres tags pertinents qui sont évidents (régime, goût, saison, température). Ne laisse jamais "tags" vide.
 
 Catégories d'ingrédients — utilise uniquement ces valeurs exactes pour "category" : ${categoryList}
-Attention aux pièges courants : le chocolat, le cacao, la farine, le sucre, la levure, la vanille, l'huile, les épices vont dans "epicerie" (ce sont des produits d'épicerie/de placard, pas des boissons). "boissons" ne sert QUE pour les liquides qu'on boit tels quels (eau, jus, soda, vin, café, thé infusé...). Le lait, la crème, le beurre, le fromage, le yaourt vont dans "laitages".
+Attention aux pièges courants :
+- "matieres_grasses" : beurre, huiles (olive, tournesol, colza...), margarine, saindoux, graisse de canard.
+- "sucreries" : sucre (blanc, roux, cassonade, glace, vanillé), miel, chocolat (noir/lait/blanc/pépites/cacao en poudre), confiture, pâte à tartiner, caramel, bonbons, sirop d'érable/agave.
+- "laitages" : lait, crème (fraîche/liquide), fromage (râpé, blanc, et tous les fromages), yaourt — mais PAS le beurre, qui va dans "matieres_grasses".
+- "epicerie" : le reste du placard sec et des condiments — farine, levure, bicarbonate, sel, poivre, épices, herbes séchées, vinaigre, moutarde, sauces, bouillon cube, extrait de vanille (sans sucre), fécule, fruits secs/oléagineux (amandes, noix, noisettes...).
+- "boissons" ne sert QUE pour les liquides qu'on boit tels quels (eau, jus, soda, vin, bière, café, thé infusé...).
 
 Unités — pour "unit_abbreviation", utilise UNIQUEMENT une de ces abréviations exactes, ou null : ${unitList}
 Choisis toujours une unité de poids ou volume adaptée (g, kg, ml, cl, l, c. à c., c. à s.) pour tout ingrédient qui se mesure en poids ou en volume (farine, sucre, beurre, chocolat, lait, huile, crème...) — ne mets JAMAIS quantity sans unit_abbreviation pour ces ingrédients-là. N'utilise "pièce" que pour des ingrédients comptés un par un (œufs, gousses d'ail, tranches, fruits entiers...). N'invente jamais une unité qui n'est pas dans la liste ci-dessus (par exemple "unité" n'existe pas, utilise "pièce").`;

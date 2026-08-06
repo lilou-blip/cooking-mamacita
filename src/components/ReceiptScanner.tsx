@@ -88,7 +88,7 @@ export function ReceiptScanner({ onDone, onCancel }: ReceiptScannerProps) {
         {items == null && (
           <>
             <p className="receipt-scanner__hint">
-              Prends une photo bien cadrée et lisible du ticket — l'IA en extrait automatiquement les articles.
+              Prends une photo bien cadrée et lisible du ticket — Mamacita en extrait automatiquement les articles.
             </p>
             <input
               ref={inputRef}

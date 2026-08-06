@@ -87,6 +87,23 @@
   margin: 0;
 }
 
+.stats__guideline-disclaimer {
+  color: var(--color-ink-soft);
+  font-size: 0.76rem;
+  font-style: italic;
+  margin: 0 0 10px;
+}
+
+.stats__guideline-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--color-ink);
+}
+
 .stats__waste-count {
   font-family: var(--font-body);
   font-size: 0.92rem;

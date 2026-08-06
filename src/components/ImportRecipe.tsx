@@ -45,11 +45,11 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
 
   return (
     <form className="import-recipe" onSubmit={handleSubmit}>
-      <h1>Importer une recette avec l'IA ✨</h1>
+      <h1>Importer une recette avec Mamacita ✨</h1>
       <p className="import-recipe__hint">
         Colle le texte d'une recette (depuis un site, une photo transcrite, etc.), ou récupère-le automatiquement
         depuis une URL — y compris un post Instagram/TikTok/Facebook <em>public</em> dont la légende contient la
-        recette — et l'IA la structure pour toi : titre, ingrédients, étapes et tags.
+        recette — et Mamacita la structure pour toi : titre, ingrédients, étapes et tags.
       </p>
 
       <div className="import-recipe__url-row">
@@ -80,7 +80,7 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
           Annuler
         </button>
         <button type="submit" className="form-submit" disabled={loading || !text.trim()}>
-          {loading ? "L'IA structure la recette... (10-30s)" : "Structurer avec l'IA"}
+          {loading ? "Mamacita structure la recette... (10-30s)" : "Structurer avec Mamacita"}
         </button>
       </div>
     </form>

@@ -27,14 +27,14 @@ async function seedIfEmpty(): Promise<void> {
       { category: "temperature", name: "chaud" },
     ],
     ingredients: [
-      { name: "beurre mou", category: "laitages", quantity: 150, unit_abbreviation: "g" },
-      { name: "cassonade", category: "epicerie", quantity: 200, unit_abbreviation: "g" },
+      { name: "beurre mou", category: "matieres_grasses", quantity: 150, unit_abbreviation: "g" },
+      { name: "cassonade", category: "sucreries", quantity: 200, unit_abbreviation: "g" },
       { name: "oeuf", category: "proteines", quantity: 1, unit_abbreviation: "pièce" },
       { name: "extrait de vanille", category: "epicerie", quantity: 1, unit_abbreviation: "c. à c." },
       { name: "farine", category: "feculents", quantity: 200, unit_abbreviation: "g" },
       { name: "bicarbonate de soude", category: "epicerie", quantity: 0.5, unit_abbreviation: "c. à c." },
       { name: "sel", category: "epicerie", quantity: 1, unit_abbreviation: "pincée" },
-      { name: "pépites de chocolat", category: "epicerie", quantity: 100, unit_abbreviation: "g" },
+      { name: "pépites de chocolat", category: "sucreries", quantity: 100, unit_abbreviation: "g" },
       { name: "noix de pécan concassées", category: "epicerie", quantity: 60, unit_abbreviation: "g" },
     ],
     steps: [

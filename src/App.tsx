@@ -20,6 +20,7 @@ import { RecipeIngredientsPage } from "./components/RecipeIngredientsPage";
 import { RecipeStepsPage } from "./components/RecipeStepsPage";
 import { RecipeForm } from "./components/RecipeForm";
 import { HomeTable } from "./components/HomeTable";
+import { LoadingScreen } from "./components/LoadingScreen";
 import { ImportRecipe } from "./components/ImportRecipe";
 import { AiAssistant } from "./components/AiAssistant";
 import type { RecipeDraft } from "./lib/ollama";
@@ -276,7 +277,7 @@ function App({ onLogout }: AppProps) {
     setView("toc");
   }
 
-  if (loading) return <p className="status-text">Chargement du carnet...</p>;
+  if (loading) return <LoadingScreen message="Ouverture du carnet..." />;
   if (error) return <p className="status-text status-text--error">Erreur: {error}</p>;
 
   function renderCarnet() {
@@ -418,19 +419,19 @@ function App({ onLogout }: AppProps) {
           onEnableNotifications={handleEnableNotifications}
         />
       ) : section === "pantry" ? (
-        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+        <Suspense fallback={<LoadingScreen />}>
           <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
         </Suspense>
       ) : section === "menus" ? (
-        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+        <Suspense fallback={<LoadingScreen />}>
           <Menus onBack={() => setSection("table")} />
         </Suspense>
       ) : section === "stats" ? (
-        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+        <Suspense fallback={<LoadingScreen />}>
           <Stats onBack={() => setSection("table")} />
         </Suspense>
       ) : section === "shopping" ? (
-        <Suspense fallback={<p className="status-text">Chargement...</p>}>
+        <Suspense fallback={<LoadingScreen />}>
           <ShoppingLists onBack={() => setSection("table")} />
         </Suspense>
       ) : (

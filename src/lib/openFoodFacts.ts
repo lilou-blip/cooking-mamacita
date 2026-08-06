@@ -6,9 +6,13 @@ function guessCategory(tags: string[]): string {
     [/vegetable|legume/, "legumes"],
     [/meat|fish|seafood|egg|poultry|proteine/, "proteines"],
     [/cereal|pasta|rice|bread|potato|starch/, "feculents"],
+    // Avant "dair" : le beurre est souvent aussi tagué laitier sur Open Food Facts, mais ne devrait pas
+    // atterrir dans "laitages" (voir la demande utilisateur).
+    [/fat|oil|butter|margarine|lard/, "matieres_grasses"],
+    [/sugar|candy|confectionery|chocolate|honey|jam|sweet/, "sucreries"],
     [/dair|cheese|milk|yogurt|yoghurt/, "laitages"],
     [/beverage|drink|water|juice|soda|wine|beer/, "boissons"],
-    [/grocer|condiment|spice|sugar|flour|sauce|snack/, "epicerie"],
+    [/grocer|condiment|spice|flour|sauce|snack/, "epicerie"],
   ];
   for (const [pattern, category] of rules) {
     if (pattern.test(joined)) return category;

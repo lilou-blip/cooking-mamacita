@@ -127,7 +127,7 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
           + Ajouter
         </button>
         <button type="button" className="form-cancel" onClick={onImport}>
-          ✨ Importer IA
+          ✨ Importer avec Mamacita
         </button>
       </div>
     </div>

@@ -58,9 +58,9 @@ export function MenuSuggestions({ menu, allRecipes, onAdded, onClose }: MenuSugg
 
   return (
     <div className="menu-suggestions">
-      <h2>Suggestions IA ✨</h2>
+      <h2>Suggestions de Mamacita ✨</h2>
       <p className="menu-suggestions__hint">
-        Décris le contexte (optionnel) et l'IA propose des recettes de ton carnet.
+        Décris le contexte (optionnel) et Mamacita propose des recettes de ton carnet.
       </p>
 
       {error && <p className="form-error">{error}</p>}
