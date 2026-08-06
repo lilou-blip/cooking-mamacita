@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useIsMobile } from "./lib/useIsMobile";
 import {
   countRecipeMade,
   deleteRecipe,
@@ -64,6 +65,7 @@ function App({ onLogout }: AppProps) {
   const [turning, setTurning] = useState<TurnDirection | null>(null);
   const [notifPermission, setNotifPermission] = useState(notificationPermission());
   const touchStartX = useRef<number | null>(null);
+  const isMobile = useIsMobile();
 
   const refreshRecipes = useCallback(async () => {
     const list = await listRecipesWithTags();
@@ -115,6 +117,14 @@ function App({ onLogout }: AppProps) {
     await openRecipeAt(index);
     setView("book");
     setTurning(null);
+  }
+
+  /** Ouverture directe sur mobile : pas de métaphore "tourner la page" à animer, on affiche juste la recette. */
+  async function openMobile(id: number) {
+    const index = recipes.findIndex((r) => r.id === id);
+    if (index === -1) return;
+    await openRecipeAt(index);
+    setView("book");
   }
 
   async function closeToToc() {
@@ -282,6 +292,49 @@ function App({ onLogout }: AppProps) {
           onCreated={handleCreated}
           onCancel={handleCancelForm}
         />
+      );
+    }
+
+    if (isMobile) {
+      if (view === "book" && currentRecipe) {
+        return (
+          <div className="mobile-carnet">
+            <button className="book-nav__back" onClick={() => setView("toc")}>
+              ← Sommaire
+            </button>
+            <div className="mobile-book-page" key={currentRecipe.id}>
+              <RecipeIngredientsPage recipe={currentRecipe} onEdit={handleEdit} onDelete={handleDelete} />
+              <RecipeStepsPage
+                recipe={currentRecipe}
+                madeCount={madeCount}
+                justMade={justMade}
+                showMadeForm={showMadeForm}
+                profiles={profiles}
+                selectedMadeProfiles={selectedMadeProfiles}
+                onMarkMadeClick={handleMarkMadeClick}
+                onToggleMadeProfile={toggleMadeProfile}
+                onConfirmMade={() => confirmMade(Array.from(selectedMadeProfiles))}
+                onCancelMadeForm={() => setShowMadeForm(false)}
+              />
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="mobile-carnet">
+          <button className="book-nav__back" onClick={() => setSection("table")}>
+            ← Table
+          </button>
+          <div className="mobile-book-page">
+            <TocPage
+              recipes={recipes}
+              selectedId={selectedTocId}
+              onSelect={openMobile}
+              onAddNew={handleAddNew}
+              onImport={handleImportClick}
+            />
+          </div>
+        </div>
       );
     }
 

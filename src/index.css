@@ -66,6 +66,32 @@ body {
   height: 100vh;
 }
 
+/* En dessous de 820px (voir useIsMobile / BookSpread.css), le carnet abandonne la métaphore livre à deux
+   pages qui se tournent — trop dense pour un téléphone — au profit d'une liste puis d'une page de recette
+   qui défile normalement, comme le reste de l'app. */
+.mobile-carnet {
+  min-height: 100vh;
+  box-sizing: border-box;
+  margin: calc(-1 * clamp(20px, 5vh, 56px)) -20px 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mobile-carnet .book-nav__back {
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.mobile-book-page {
+  flex: 1;
+  background: var(--color-cream);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-page);
+  padding: 20px 16px 28px;
+  position: relative;
+}
+
 .book-nav__toolbar {
   display: flex;
   align-items: center;
