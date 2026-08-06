@@ -84,6 +84,18 @@
   transform: rotate(6deg) translateY(-8px) scale(1.05);
 }
 
+.home-object--shopping {
+  bottom: 3%;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+}
+.home-object--shopping img {
+  width: 230px;
+}
+.home-object--shopping:hover {
+  transform: translateX(-50%) rotate(-3deg) translateY(-8px) scale(1.05);
+}
+
 @media (max-width: 640px) {
   .home-table__title {
     font-size: clamp(2rem, 8vw, 2.8rem);
@@ -94,5 +106,8 @@
   }
   .home-object--pantry img {
     width: 210px;
+  }
+  .home-object--shopping img {
+    width: 150px;
   }
 }

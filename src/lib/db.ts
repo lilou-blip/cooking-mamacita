@@ -1,4 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
+import { ingredientFamily, ingredientMatchesStaple } from "./ingredientMatching";
+import { createUnitConverter } from "./unitConversion";
 
 const DB_URL = "sqlite:cooking-mamacita.db";
 
@@ -6,6 +8,14 @@ let dbPromise: Promise<Database> | null = null;
 function getDb(): Promise<Database> {
   if (!dbPromise) dbPromise = Database.load(DB_URL);
   return dbPromise;
+}
+
+/** Construit la clause `VALUES ($1, $2, ...), ($colCount+1, ...), ...` d'un INSERT multi-lignes. */
+export function valuesPlaceholders(rowCount: number, colCount: number): string {
+  return Array.from({ length: rowCount }, (_, i) => {
+    const base = i * colCount;
+    return `(${Array.from({ length: colCount }, (_, j) => `$${base + j + 1}`).join(", ")})`;
+  }).join(", ");
 }
 
 export type TagCategory = "type" | "regime" | "gout" | "saison" | "temperature";
@@ -117,11 +127,14 @@ export interface Unit {
   name: string;
   abbreviation: string;
   unit_type: UnitType;
+  factor_to_base: number;
 }
 
 export async function listUnits(): Promise<Unit[]> {
   const db = await getDb();
-  return db.select<Unit[]>("SELECT id, name, abbreviation, unit_type FROM units ORDER BY unit_type, name");
+  return db.select<Unit[]>(
+    "SELECT id, name, abbreviation, unit_type, factor_to_base FROM units ORDER BY unit_type, name",
+  );
 }
 
 export interface Ingredient {
@@ -215,28 +228,56 @@ export interface NewRecipe {
 }
 
 async function writeRecipeRelations(db: Database, recipeId: number, input: NewRecipe): Promise<void> {
-  for (const tag of input.tags) {
-    const tagId = await findTagId(tag.category, tag.name);
-    if (tagId !== null) {
-      await db.execute("INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)", [recipeId, tagId]);
-    }
-  }
-
-  for (let position = 0; position < input.ingredients.length; position++) {
-    const ing = input.ingredients[position];
-    const ingredientId = await findOrCreateIngredient(ing.name, ing.category ?? "autre");
-    const unitId = ing.unit_abbreviation ? await findUnitByAbbreviation(ing.unit_abbreviation) : null;
+  // Résout les tags en parallèle (lectures indépendantes, aucun risque de doublon en base), puis insère
+  // toutes les lignes en un seul aller-retour au lieu d'un INSERT par tag.
+  const tagIds = await Promise.all(input.tags.map((tag) => findTagId(tag.category, tag.name)));
+  const validTagIds = tagIds.filter((id): id is number => id !== null);
+  if (validTagIds.length > 0) {
     await db.execute(
-      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit_id, position, note)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [recipeId, ingredientId, ing.quantity, unitId, position, ing.note ?? null],
+      `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ${valuesPlaceholders(validTagIds.length, 2)}`,
+      validTagIds.flatMap((tagId) => [recipeId, tagId]),
     );
   }
 
-  for (let i = 0; i < input.steps.length; i++) {
+  // findOrCreateIngredient fait un SELECT puis un INSERT si absent : le paralléliser directement pour
+  // chaque ligne de la recette risquerait une double création si le même ingrédient apparaît deux fois.
+  // On résout donc chaque nom/unité UNIQUE une seule fois en parallèle, puis on réutilise le résultat.
+  const uniqueIngredientKeys = new Map(input.ingredients.map((ing) => [`${ing.name}:${ing.category ?? "autre"}`, ing]));
+  const uniqueUnitAbbrs = [...new Set(input.ingredients.map((ing) => ing.unit_abbreviation).filter((a): a is string => !!a))];
+
+  const [ingredientEntries, unitEntries] = await Promise.all([
+    Promise.all(
+      [...uniqueIngredientKeys.entries()].map(async ([key, ing]) => {
+        const id = await findOrCreateIngredient(ing.name, ing.category ?? "autre");
+        return [key, id] as const;
+      }),
+    ),
+    Promise.all(uniqueUnitAbbrs.map(async (abbr) => [abbr, await findUnitByAbbreviation(abbr)] as const)),
+  ]);
+  const ingredientIdByKey = new Map(ingredientEntries);
+  const unitIdByAbbr = new Map(unitEntries);
+
+  if (input.ingredients.length > 0) {
+    const params = input.ingredients.flatMap((ing, position) => [
+      recipeId,
+      ingredientIdByKey.get(`${ing.name}:${ing.category ?? "autre"}`),
+      ing.quantity,
+      ing.unit_abbreviation ? unitIdByAbbr.get(ing.unit_abbreviation) ?? null : null,
+      position,
+      ing.note ?? null,
+    ]);
     await db.execute(
-      "INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES ($1, $2, $3)",
-      [recipeId, i + 1, input.steps[i]],
+      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit_id, position, note)
+       VALUES ${valuesPlaceholders(input.ingredients.length, 6)}`,
+      params,
+    );
+  }
+
+  if (input.steps.length > 0) {
+    const params = input.steps.flatMap((instruction, i) => [recipeId, i + 1, instruction]);
+    await db.execute(
+      `INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES ${valuesPlaceholders(input.steps.length, 3)}`,
+      params,
     );
   }
 }
@@ -300,11 +341,14 @@ export interface Profile {
   color: string;
   relation: string | null;
   avatar: string | null;
+  dietary_notes: string | null;
 }
 
 export async function listProfiles(): Promise<Profile[]> {
   const db = await getDb();
-  return db.select<Profile[]>("SELECT id, name, color, relation, avatar FROM consumer_profiles ORDER BY created_at");
+  return db.select<Profile[]>(
+    "SELECT id, name, color, relation, avatar, dietary_notes FROM consumer_profiles ORDER BY created_at",
+  );
 }
 
 export async function createProfile(input: {
@@ -312,23 +356,24 @@ export async function createProfile(input: {
   color: string;
   relation?: string | null;
   avatar?: string | null;
+  dietary_notes?: string | null;
 }): Promise<number> {
   const db = await getDb();
   const result = await db.execute(
-    "INSERT INTO consumer_profiles (name, color, relation, avatar) VALUES ($1, $2, $3, $4)",
-    [input.name, input.color, input.relation ?? null, input.avatar ?? null],
+    "INSERT INTO consumer_profiles (name, color, relation, avatar, dietary_notes) VALUES ($1, $2, $3, $4, $5)",
+    [input.name, input.color, input.relation ?? null, input.avatar ?? null, input.dietary_notes ?? null],
   );
   return result.lastInsertId as number;
 }
 
 export async function updateProfile(
   id: number,
-  input: { name: string; color: string; relation?: string | null; avatar?: string | null },
+  input: { name: string; color: string; relation?: string | null; avatar?: string | null; dietary_notes?: string | null },
 ): Promise<void> {
   const db = await getDb();
   await db.execute(
-    "UPDATE consumer_profiles SET name = $1, color = $2, relation = $3, avatar = $4 WHERE id = $5",
-    [input.name, input.color, input.relation ?? null, input.avatar ?? null, id],
+    "UPDATE consumer_profiles SET name = $1, color = $2, relation = $3, avatar = $4, dietary_notes = $5 WHERE id = $6",
+    [input.name, input.color, input.relation ?? null, input.avatar ?? null, input.dietary_notes ?? null, id],
   );
 }
 
@@ -465,6 +510,19 @@ export async function deletePantryItem(id: number): Promise<void> {
   await db.execute("DELETE FROM pantry_items WHERE id = $1", [id]);
 }
 
+/** Ajuste rapidement la quantité d'un article (+1/-1...) sans passer par le formulaire de consommation. Supprime l'article si la quantité tombe à 0. */
+export async function adjustPantryItemQuantity(id: number, delta: number): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<{ quantity: number }[]>("SELECT quantity FROM pantry_items WHERE id = $1", [id]);
+  const current = rows[0]?.quantity ?? 0;
+  const next = Math.round((current + delta) * 100) / 100;
+  if (next <= 0) {
+    await db.execute("DELETE FROM pantry_items WHERE id = $1", [id]);
+  } else {
+    await db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [next, id]);
+  }
+}
+
 /** Réduit la quantité d'un article du garde-manger et journalise qui l'a consommé. Supprime la ligne si elle atteint 0. */
 export async function consumePantryItem(
   id: number,
@@ -472,8 +530,8 @@ export async function consumePantryItem(
   profileId?: number | null,
 ): Promise<void> {
   const db = await getDb();
-  const rows = await db.select<{ quantity: number; ingredient_id: number; unit_id: number | null }[]>(
-    "SELECT quantity, ingredient_id, unit_id FROM pantry_items WHERE id = $1",
+  const rows = await db.select<{ quantity: number; ingredient_id: number; unit_id: number | null; expires_at: string | null }[]>(
+    "SELECT quantity, ingredient_id, unit_id, expires_at FROM pantry_items WHERE id = $1",
     [id],
   );
   const item = rows[0];
@@ -490,33 +548,55 @@ export async function consumePantryItem(
     "INSERT INTO pantry_consumption_log (ingredient_id, profile_id, quantity, unit_id) VALUES ($1, $2, $3, $4)",
     [item.ingredient_id, profileId ?? null, quantityConsumed, item.unit_id],
   );
+
+  // Aliment consommé alors qu'il était proche de la péremption (ou déjà périmé) : gaspillage évité, on le journalise pour les stats éco.
+  if (item.expires_at) {
+    const daysLeft = (new Date(item.expires_at).getTime() - Date.now()) / 86_400_000;
+    if (daysLeft <= 3) {
+      await db.execute(
+        "INSERT INTO pantry_waste_avoided_log (ingredient_id, quantity, unit_id) VALUES ($1, $2, $3)",
+        [item.ingredient_id, quantityConsumed, item.unit_id],
+      );
+    }
+  }
 }
 
 /** Déduit du garde-manger les ingrédients d'une recette, en piochant d'abord dans les articles qui expirent le plus tôt. */
 async function deductRecipeFromPantry(db: Database, ingredients: RecipeIngredientView[], scale: number): Promise<void> {
-  for (const ing of ingredients) {
-    if (ing.quantity == null) continue;
-    let needed = ing.quantity * scale;
+  const relevant = ingredients.filter((ing) => ing.quantity != null);
 
-    const pantryRows = await db.select<{ id: number; quantity: number }[]>(
-      `SELECT id, quantity FROM pantry_items
-       WHERE ingredient_id = $1 AND unit_id IS $2
-       ORDER BY (expires_at IS NULL), expires_at ASC`,
-      [ing.ingredient_id, ing.unit_id],
-    );
+  // Lecture : une requête par ingrédient, mais indépendantes les unes des autres -> en parallèle.
+  const pantryRowsByIngredient = await Promise.all(
+    relevant.map((ing) =>
+      db.select<{ id: number; quantity: number }[]>(
+        `SELECT id, quantity FROM pantry_items
+         WHERE ingredient_id = $1 AND unit_id IS $2
+         ORDER BY (expires_at IS NULL), expires_at ASC`,
+        [ing.ingredient_id, ing.unit_id],
+      ),
+    ),
+  );
 
-    for (const row of pantryRows) {
+  // Calcul pur (aucun accès DB) : détermine, pour chaque article pioché, s'il faut le supprimer ou juste
+  // décrémenter sa quantité. Chaque article n'est touché qu'une fois, donc l'écriture peut être parallélisée.
+  const mutations: { id: number; remaining: number }[] = [];
+  relevant.forEach((ing, i) => {
+    let needed = ing.quantity! * scale;
+    for (const row of pantryRowsByIngredient[i]) {
       if (needed <= 0) break;
       const take = Math.min(row.quantity, needed);
       needed -= take;
-      const remaining = Math.round((row.quantity - take) * 100) / 100;
-      if (remaining <= 0) {
-        await db.execute("DELETE FROM pantry_items WHERE id = $1", [row.id]);
-      } else {
-        await db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [remaining, row.id]);
-      }
+      mutations.push({ id: row.id, remaining: Math.round((row.quantity - take) * 100) / 100 });
     }
-  }
+  });
+
+  await Promise.all(
+    mutations.map((m) =>
+      m.remaining <= 0
+        ? db.execute("DELETE FROM pantry_items WHERE id = $1", [m.id])
+        : db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [m.remaining, m.id]),
+    ),
+  );
 }
 
 export async function countRecipeMade(recipeId: number): Promise<number> {
@@ -540,10 +620,10 @@ export async function markRecipeMade(recipeId: number, servings: number, profile
   ]);
   const logId = result.lastInsertId as number;
 
-  for (const profileId of profileIds) {
+  if (profileIds.length > 0) {
     await db.execute(
-      "INSERT INTO consumption_log_profiles (consumption_log_id, profile_id) VALUES ($1, $2)",
-      [logId, profileId],
+      `INSERT INTO consumption_log_profiles (consumption_log_id, profile_id) VALUES ${valuesPlaceholders(profileIds.length, 2)}`,
+      profileIds.flatMap((profileId) => [logId, profileId]),
     );
   }
 
@@ -674,11 +754,34 @@ export interface ShoppingListItem {
   price: number | null;
   price_is_estimate: boolean;
   checked: boolean;
+  is_suggested: boolean;
 }
 
 export interface ShoppingListFull extends ShoppingList {
   items: ShoppingListItem[];
 }
+
+/** Renvoie l'unique liste de courses "libre" (sans menu associé), utilisée depuis la table, en la créant si besoin. */
+export async function getOrCreateStandaloneShoppingList(): Promise<number> {
+  const db = await getDb();
+  const existing = await db.select<{ id: number }[]>(
+    "SELECT id FROM shopping_lists WHERE menu_id IS NULL ORDER BY created_at ASC LIMIT 1",
+  );
+  if (existing[0]) return existing[0].id;
+
+  const result = await db.execute("INSERT INTO shopping_lists (menu_id, name) VALUES (NULL, $1)", ["Liste de courses"]);
+  return result.lastInsertId as number;
+}
+
+/** Produits de base qu'on veut se voir suggérer dès qu'il en reste peu, même s'ils ne sont pas requis par le menu. */
+const STAPLE_DEFAULTS: { name: string; category: string; quantity: number; unitAbbr: string | null }[] = [
+  { name: "oeufs", category: "proteines", quantity: 6, unitAbbr: null },
+  { name: "farine", category: "epicerie", quantity: 1, unitAbbr: "kg" },
+  { name: "sucre", category: "epicerie", quantity: 1, unitAbbr: "kg" },
+  { name: "huile", category: "epicerie", quantity: 1, unitAbbr: "l" },
+  { name: "lait", category: "laitages", quantity: 1, unitAbbr: "l" },
+  { name: "beurre", category: "laitages", quantity: 250, unitAbbr: "g" },
+];
 
 export async function generateShoppingListForMenu(menuId: number): Promise<number> {
   const db = await getDb();
@@ -686,28 +789,42 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
   if (!menu) throw new Error("Menu introuvable");
 
   const recipes = await Promise.all(menu.recipes.map((menuRecipe) => getRecipeById(menuRecipe.recipe_id)));
+  const units = await listUnits();
+  const { unitById, unitTypeOf, toBase } = createUnitConverter(units);
+  const unitAbbrToId = new Map(units.map((u) => [u.abbreviation, u.id]));
 
-  const needed = new Map<string, { ingredient_id: number; unit_id: number | null; quantity: number }>();
+  // Regroupé par ingrédient ET par type d'unité (masse/volume/pièce) : on ne compare jamais des grammes à des millilitres.
+  const needed = new Map<
+    string,
+    { ingredientId: number; baseQuantity: number; displayUnitId: number | null; displayQuantity: number }
+  >();
   menu.recipes.forEach((menuRecipe, i) => {
     const recipe = recipes[i];
     if (!recipe) return;
     const scale = recipe.servings > 0 ? menuRecipe.servings / recipe.servings : 1;
     for (const ing of recipe.ingredients) {
       if (ing.quantity == null) continue;
-      const key = `${ing.ingredient_id}:${ing.unit_id ?? "none"}`;
       const scaledQty = ing.quantity * scale;
+      const baseQty = toBase(scaledQty, ing.unit_id);
+      const key = `${ing.ingredient_id}:${unitTypeOf(ing.unit_id)}`;
       const existing = needed.get(key);
-      if (existing) existing.quantity += scaledQty;
-      else needed.set(key, { ingredient_id: ing.ingredient_id, unit_id: ing.unit_id, quantity: scaledQty });
+      if (existing) {
+        existing.baseQuantity += baseQty;
+        if (existing.displayUnitId === ing.unit_id) existing.displayQuantity += scaledQty;
+      } else {
+        needed.set(key, { ingredientId: ing.ingredient_id, baseQuantity: baseQty, displayUnitId: ing.unit_id, displayQuantity: scaledQty });
+      }
     }
   });
 
   const pantryRows = await db.select<{ ingredient_id: number; unit_id: number | null; total: number }[]>(
     "SELECT ingredient_id, unit_id, SUM(quantity) as total FROM pantry_items GROUP BY ingredient_id, unit_id",
   );
-  const pantryMap = new Map<string, number>();
+  const pantryBaseByKey = new Map<string, number>();
   for (const row of pantryRows) {
-    pantryMap.set(`${row.ingredient_id}:${row.unit_id ?? "none"}`, row.total);
+    const baseQty = toBase(row.total, row.unit_id);
+    const key = `${row.ingredient_id}:${unitTypeOf(row.unit_id)}`;
+    pantryBaseByKey.set(key, (pantryBaseByKey.get(key) ?? 0) + baseQty);
   }
 
   const result = await db.execute("INSERT INTO shopping_lists (menu_id, name) VALUES ($1, $2)", [
@@ -716,18 +833,133 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
   ]);
   const shoppingListId = result.lastInsertId as number;
 
-  for (const entry of needed.values()) {
-    const key = `${entry.ingredient_id}:${entry.unit_id ?? "none"}`;
-    const inPantry = pantryMap.get(key) ?? 0;
-    const remaining = entry.quantity - inPantry;
-    if (remaining <= 0) continue;
+  const addedIngredientIds = new Set<number>();
+
+  // Calcul pur : détermine quelles lignes manquent, sans toucher la DB.
+  const missingRows: { ingredientId: number; quantity: number; unitId: number | null }[] = [];
+  for (const [key, entry] of needed.entries()) {
+    const inPantryBase = pantryBaseByKey.get(key) ?? 0;
+    if (inPantryBase >= entry.baseQuantity) continue; // déjà assez en stock (même type d'unité, converti pour comparer)
+
+    const unit = entry.displayUnitId != null ? unitById.get(entry.displayUnitId) : undefined;
+    const missingBase = entry.baseQuantity - inPantryBase;
+    const missingDisplay = unit ? missingBase / unit.factor_to_base : missingBase;
+
+    missingRows.push({
+      ingredientId: entry.ingredientId,
+      quantity: Math.round(missingDisplay * 100) / 100,
+      unitId: entry.displayUnitId,
+    });
+    addedIngredientIds.add(entry.ingredientId);
+  }
+
+  if (missingRows.length > 0) {
     await db.execute(
-      "INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id) VALUES ($1, $2, $3, $4)",
-      [shoppingListId, entry.ingredient_id, Math.round(remaining * 100) / 100, entry.unit_id],
+      `INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id) VALUES ${valuesPlaceholders(missingRows.length, 4)}`,
+      missingRows.flatMap((r) => [shoppingListId, r.ingredientId, r.quantity, r.unitId]),
     );
   }
 
+  // Suggestions : produits de base bientôt épuisés (toutes variantes confondues : "beurre"/"beurre mou", "oeuf"/"oeufs"...),
+  // même s'ils ne sont pas requis par les recettes du menu. On suggère toujours le produit "propre" avec une quantité réaliste.
+  const allIngredients = await listIngredients();
+  const stapleTodo = STAPLE_DEFAULTS.filter((staple) => {
+    const matchingIds = allIngredients.filter((ing) => ingredientMatchesStaple(ing.name, staple.name)).map((ing) => ing.id);
+    if (matchingIds.some((id) => addedIngredientIds.has(id))) return false; // déjà dans la liste via une recette
+
+    const stockBase = matchingIds.reduce((sum, id) => {
+      const type = staple.unitAbbr ? (unitById.get(unitAbbrToId.get(staple.unitAbbr) ?? -1)?.unit_type ?? "piece") : "piece";
+      return sum + (pantryBaseByKey.get(`${id}:${type}`) ?? 0);
+    }, 0);
+    const threshold = staple.unitAbbr == null ? 2 : 150;
+    return stockBase <= threshold;
+  });
+
+  // Les noms des produits de base sont tous distincts entre eux -> aucune collision possible, sûr à paralléliser.
+  const staplesToInsert = await Promise.all(
+    stapleTodo.map(async (staple) => ({
+      canonicalId: await findOrCreateIngredient(staple.name, staple.category),
+      unitId: staple.unitAbbr ? unitAbbrToId.get(staple.unitAbbr) ?? null : null,
+      quantity: staple.quantity,
+    })),
+  );
+
+  if (staplesToInsert.length > 0) {
+    await db.execute(
+      `INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id, is_suggested)
+       VALUES ${valuesPlaceholders(staplesToInsert.length, 5)}`,
+      staplesToInsert.flatMap((s) => [shoppingListId, s.canonicalId, s.quantity, s.unitId, 1]),
+    );
+  }
+
+  await mergeDuplicateShoppingListItems(shoppingListId);
+
   return shoppingListId;
+}
+
+/** Fusionne les articles en double d'une liste de courses (ex: "2 œufs" + "1 œuf" -> "3 œufs", "beurre mou" + "beurre" -> "beurre"). */
+export async function mergeDuplicateShoppingListItems(shoppingListId: number): Promise<void> {
+  const db = await getDb();
+  const units = await listUnits();
+  const { unitById, unitTypeOf, toBase } = createUnitConverter(units);
+
+  const rows = await db.select<
+    { id: number; ingredient_id: number; ingredient_name: string; quantity: number | null; unit_id: number | null; is_suggested: number }[]
+  >(
+    `SELECT sli.id, sli.ingredient_id, i.name as ingredient_name, sli.quantity, sli.unit_id, sli.is_suggested
+     FROM shopping_list_items sli JOIN ingredients i ON i.id = sli.ingredient_id
+     WHERE sli.shopping_list_id = $1`,
+    [shoppingListId],
+  );
+
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const key = `${ingredientFamily(row.ingredient_name)}:${unitTypeOf(row.unit_id)}`;
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+
+  // Chaque groupe (et, à l'intérieur d'un groupe, l'UPDATE de la ligne conservée et les DELETE des autres)
+  // touche des lignes distinctes : tout peut s'exécuter en parallèle plutôt que groupe par groupe.
+  const writes: Promise<unknown>[] = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+
+    // Garde le nom le plus "propre" (le plus court, ex: "beurre" plutôt que "beurre mou") comme article restant.
+    const displayRow = [...group].sort((a, b) => a.ingredient_name.length - b.ingredient_name.length)[0];
+    const displayUnit = displayRow.unit_id != null ? unitById.get(displayRow.unit_id) : undefined;
+
+    let totalBase = 0;
+    let hasQuantity = false;
+    for (const row of group) {
+      if (row.quantity != null) {
+        hasQuantity = true;
+        totalBase += toBase(row.quantity, row.unit_id);
+      }
+    }
+    const mergedQuantity = hasQuantity ? (displayUnit ? totalBase / displayUnit.factor_to_base : totalBase) : null;
+    const isSuggested = group.some((r) => r.is_suggested) ? 1 : 0;
+
+    writes.push(
+      db.execute(
+        "UPDATE shopping_list_items SET ingredient_id = $1, quantity = $2, unit_id = $3, is_suggested = $4, price = NULL, price_is_estimate = 0 WHERE id = $5",
+        [
+          displayRow.ingredient_id,
+          mergedQuantity != null ? Math.round(mergedQuantity * 100) / 100 : null,
+          displayRow.unit_id,
+          isSuggested,
+          displayRow.id,
+        ],
+      ),
+    );
+    for (const row of group) {
+      if (row.id !== displayRow.id) {
+        writes.push(db.execute("DELETE FROM shopping_list_items WHERE id = $1", [row.id]));
+      }
+    }
+  }
+  await Promise.all(writes);
 }
 
 export async function getShoppingListById(id: number): Promise<ShoppingListFull | null> {
@@ -747,10 +979,12 @@ export async function getShoppingListById(id: number): Promise<ShoppingListFull 
       price: number | null;
       price_is_estimate: number;
       checked: number;
+      is_suggested: number;
     }[]
   >(
     `SELECT sli.id, sli.ingredient_id, i.name as ingredient_name, sli.quantity,
-            sli.unit_id, u.abbreviation as unit_abbreviation, sli.price, sli.price_is_estimate, sli.checked
+            sli.unit_id, u.abbreviation as unit_abbreviation, sli.price, sli.price_is_estimate, sli.checked,
+            sli.is_suggested
      FROM shopping_list_items sli
      JOIN ingredients i ON i.id = sli.ingredient_id
      LEFT JOIN units u ON u.id = sli.unit_id
@@ -763,6 +997,7 @@ export async function getShoppingListById(id: number): Promise<ShoppingListFull 
     ...r,
     price_is_estimate: !!r.price_is_estimate,
     checked: !!r.checked,
+    is_suggested: !!r.is_suggested,
   }));
 
   return { ...list, items };
@@ -783,6 +1018,27 @@ export async function updateShoppingListItem(
   if (patch.checked !== undefined) {
     await db.execute("UPDATE shopping_list_items SET checked = $1 WHERE id = $2", [patch.checked ? 1 : 0, id]);
   }
+}
+
+/** Ajoute un article saisi manuellement (pas dérivé d'une recette) à une liste de courses existante. */
+export async function addShoppingListItem(
+  shoppingListId: number,
+  input: { ingredient_name: string; ingredient_category?: string; quantity: number | null; unit_abbreviation: string | null },
+): Promise<number> {
+  const db = await getDb();
+  const ingredientId = await findOrCreateIngredient(input.ingredient_name, input.ingredient_category ?? "autre");
+  const unitId = input.unit_abbreviation ? await findUnitByAbbreviation(input.unit_abbreviation) : null;
+  const result = await db.execute(
+    "INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id) VALUES ($1, $2, $3, $4)",
+    [shoppingListId, ingredientId, input.quantity, unitId],
+  );
+  await mergeDuplicateShoppingListItems(shoppingListId);
+  return result.lastInsertId as number;
+}
+
+export async function deleteShoppingListItem(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM shopping_list_items WHERE id = $1", [id]);
 }
 
 export interface TopRecipeStat {
@@ -887,5 +1143,44 @@ export async function getConsumptionByProfile(): Promise<ProfileStat[]> {
      JOIN consumer_profiles pr ON pr.id = combined.profile_id
      GROUP BY pr.id
      ORDER BY count DESC`,
+  );
+}
+
+export interface WasteAvoidedItem {
+  ingredient_name: string;
+  quantity: number;
+  unit_abbreviation: string | null;
+  consumed_at: string;
+}
+
+/** Aliments consommés à temps (proches de la péremption ou déjà périmés), donc sauvés du gaspillage. */
+export async function getWasteAvoidedItems(): Promise<WasteAvoidedItem[]> {
+  const db = await getDb();
+  return db.select<WasteAvoidedItem[]>(
+    `SELECT i.name as ingredient_name, w.quantity, u.abbreviation as unit_abbreviation, w.consumed_at
+     FROM pantry_waste_avoided_log w
+     JOIN ingredients i ON i.id = w.ingredient_id
+     LEFT JOIN units u ON u.id = w.unit_id
+     ORDER BY w.consumed_at DESC`,
+  );
+}
+
+export interface ShoppingBudgetPoint {
+  shopping_list_id: number;
+  name: string;
+  created_at: string;
+  total_price: number;
+}
+
+/** Évolution du budget courses estimé au fil des listes de courses générées/remplies. */
+export async function getShoppingBudgetTrend(): Promise<ShoppingBudgetPoint[]> {
+  const db = await getDb();
+  return db.select<ShoppingBudgetPoint[]>(
+    `SELECT sl.id as shopping_list_id, sl.name, sl.created_at, COALESCE(SUM(sli.price), 0) as total_price
+     FROM shopping_lists sl
+     LEFT JOIN shopping_list_items sli ON sli.shopping_list_id = sl.id
+     GROUP BY sl.id
+     HAVING total_price > 0
+     ORDER BY sl.created_at ASC`,
   );
 }

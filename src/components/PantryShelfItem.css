@@ -59,6 +59,33 @@
   border-radius: var(--radius-tag);
 }
 
+.pantry-shelf-item__adjust {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pantry-shelf-item__adjust-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  font-weight: 800;
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.pantry-shelf-item__adjust-btn:hover {
+  background: var(--color-groseille);
+  color: var(--color-white);
+}
+
 .pantry-shelf-item__name {
   font-size: 0.78rem;
   font-weight: 700;

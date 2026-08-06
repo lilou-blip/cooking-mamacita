@@ -58,7 +58,31 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
               const isActive = cell?.day === day && cell?.slot === slot.value;
               return (
                 <div key={`${slot.value}-${day}`} className="weekly-grid__cell">
-                  {isActive ? (
+                  {!isActive &&
+                    (entry ? (
+                      <div className={`weekly-grid__entry${entry.made ? " weekly-grid__entry--made" : ""}`}>
+                        <span>{entry.title}</span>
+                        <div className="weekly-grid__entry-actions">
+                          <input
+                            type="checkbox"
+                            checked={entry.made}
+                            onChange={(e) =>
+                              onToggleMade(entry.menu_recipe_id, entry.recipe_id, entry.servings, e.target.checked)
+                            }
+                            aria-label="Fait"
+                          />
+                          <button type="button" onClick={() => onRemove(entry.menu_recipe_id)} aria-label="Retirer">
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button" className="weekly-grid__add" onClick={() => openCell(day, slot.value)}>
+                        +
+                      </button>
+                    ))}
+
+                  {isActive && (
                     <div className="weekly-grid__picker">
                       <select value={recipeId} onChange={(e) => setRecipeId(e.target.value)} autoFocus>
                         <option value="">Recette...</option>
@@ -74,6 +98,7 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
                         className="weekly-grid__servings"
                         value={servings}
                         onChange={(e) => setServings(e.target.value)}
+                        placeholder="Portions"
                       />
                       <div className="weekly-grid__picker-actions">
                         <button type="button" className="form-cancel" onClick={() => setCell(null)}>
@@ -84,27 +109,6 @@ export function WeeklyMenuGrid({ menu, allRecipes, onToggleMade, onRemove, onAdd
                         </button>
                       </div>
                     </div>
-                  ) : entry ? (
-                    <div className={`weekly-grid__entry${entry.made ? " weekly-grid__entry--made" : ""}`}>
-                      <span>{entry.title}</span>
-                      <div className="weekly-grid__entry-actions">
-                        <input
-                          type="checkbox"
-                          checked={entry.made}
-                          onChange={(e) =>
-                            onToggleMade(entry.menu_recipe_id, entry.recipe_id, entry.servings, e.target.checked)
-                          }
-                          aria-label="Fait"
-                        />
-                        <button type="button" onClick={() => onRemove(entry.menu_recipe_id)} aria-label="Retirer">
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" className="weekly-grid__add" onClick={() => openCell(day, slot.value)}>
-                      +
-                    </button>
                   )}
                 </div>
               );

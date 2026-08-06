@@ -4,14 +4,19 @@ import {
   deleteProfile,
   getConsumptionByCategory,
   getConsumptionByProfile,
+  getShoppingBudgetTrend,
   getTopMadeRecipes,
+  getWasteAvoidedItems,
   listProfiles,
   updateProfile,
   type CategoryStat,
   type ProfileStat,
   type Profile,
+  type ShoppingBudgetPoint,
   type TopRecipeStat,
+  type WasteAvoidedItem,
 } from "../lib/db";
+import { estimatePriceRange } from "../lib/ollama";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
 import { getAvatarUrl } from "../lib/avatarIllustrations";
 import { BarChart } from "./BarChart";
@@ -30,6 +35,10 @@ export function Stats({ onBack }: StatsProps) {
   const [topRecipes, setTopRecipes] = useState<TopRecipeStat[]>([]);
   const [byCategory, setByCategory] = useState<CategoryStat[]>([]);
   const [byProfile, setByProfile] = useState<ProfileStat[]>([]);
+  const [wasteItems, setWasteItems] = useState<WasteAvoidedItem[]>([]);
+  const [budgetTrend, setBudgetTrend] = useState<ShoppingBudgetPoint[]>([]);
+  const [wasteValue, setWasteValue] = useState<number | null>(null);
+  const [estimatingWaste, setEstimatingWaste] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async (profileId: number | null) => {
@@ -47,10 +56,34 @@ export function Stats({ onBack }: StatsProps) {
     (async () => {
       setProfiles(await listProfiles());
       await refresh(null);
+      setWasteItems(await getWasteAvoidedItems());
+      setBudgetTrend(await getShoppingBudgetTrend());
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleEstimateWasteValue() {
+    if (wasteItems.length === 0) return;
+    setEstimatingWaste(true);
+    try {
+      const grouped = new Map<string, { name: string; quantity: number; unit: string | null }>();
+      for (const item of wasteItems) {
+        const key = `${item.ingredient_name.toLowerCase()}:${item.unit_abbreviation ?? ""}`;
+        const existing = grouped.get(key);
+        if (existing) existing.quantity += item.quantity;
+        else grouped.set(key, { name: item.ingredient_name, quantity: item.quantity, unit: item.unit_abbreviation });
+      }
+      let total = 0;
+      for (const g of grouped.values()) {
+        const range = await estimatePriceRange(g.name, g.quantity, g.unit);
+        total += (range.low + range.high) / 2;
+      }
+      setWasteValue(Math.round(total * 100) / 100);
+    } finally {
+      setEstimatingWaste(false);
+    }
+  }
 
   async function selectProfile(id: number | null) {
     setSelectedProfileId(id);
@@ -59,13 +92,19 @@ export function Stats({ onBack }: StatsProps) {
     setLoading(false);
   }
 
-  async function handleAddProfile(name: string, color: string, avatar: string | null) {
-    await createProfile({ name, color, avatar });
+  async function handleAddProfile(name: string, color: string, avatar: string | null, dietaryNotes: string | null) {
+    await createProfile({ name, color, avatar, dietary_notes: dietaryNotes });
     setProfiles(await listProfiles());
   }
 
-  async function handleUpdateProfile(id: number, name: string, color: string, avatar: string | null) {
-    await updateProfile(id, { name, color, avatar });
+  async function handleUpdateProfile(
+    id: number,
+    name: string,
+    color: string,
+    avatar: string | null,
+    dietaryNotes: string | null,
+  ) {
+    await updateProfile(id, { name, color, avatar, dietary_notes: dietaryNotes });
     setProfiles(await listProfiles());
   }
 
@@ -81,7 +120,8 @@ export function Stats({ onBack }: StatsProps) {
 
   if (loading) return <p className="status-text">Chargement des statistiques...</p>;
 
-  const hasAnyData = topRecipes.length > 0 || byCategory.length > 0 || byProfile.length > 0;
+  const hasAnyData =
+    topRecipes.length > 0 || byCategory.length > 0 || byProfile.length > 0 || wasteItems.length > 0 || budgetTrend.length > 0;
 
   return (
     <div className="stats">
@@ -177,6 +217,48 @@ export function Stats({ onBack }: StatsProps) {
               )}
             </section>
           )}
+
+          <section className="stats__section">
+            <h2>Anti-gaspillage</h2>
+            {wasteItems.length > 0 ? (
+              <>
+                <p className="stats__waste-count">
+                  <strong>{wasteItems.length}</strong> aliment(s) sauvé(s) du gaspillage (consommés proches de la
+                  péremption ou déjà périmés).
+                </p>
+                {wasteValue != null ? (
+                  <p className="stats__waste-value">≈ {wasteValue.toFixed(2)} € de nourriture évitée du gaspillage</p>
+                ) : (
+                  <button
+                    type="button"
+                    className="stats__estimate-waste"
+                    onClick={handleEstimateWasteValue}
+                    disabled={estimatingWaste}
+                  >
+                    {estimatingWaste ? "Estimation..." : "💰 Estimer la valeur"}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="stats__empty">
+                Pas encore de données — consomme des aliments proches de la péremption pour voir cette section évoluer.
+              </p>
+            )}
+          </section>
+
+          <section className="stats__section">
+            <h2>Budget courses</h2>
+            {budgetTrend.length > 0 ? (
+              <BarChart
+                items={budgetTrend.slice(-8).map((b) => ({
+                  label: new Date(b.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
+                  value: Math.round(b.total_price * 100) / 100,
+                }))}
+              />
+            ) : (
+              <p className="stats__empty">Pas encore de listes de courses avec des prix estimés.</p>
+            )}
+          </section>
         </div>
       )}
     </div>

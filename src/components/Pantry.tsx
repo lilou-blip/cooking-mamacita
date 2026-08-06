@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  adjustPantryItemQuantity,
   consumePantryItem,
   deletePantryItem,
   listPantryItems,
@@ -47,6 +48,11 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
   async function handleDelete(id: number, title: string) {
     if (!window.confirm(`Retirer "${title}" du garde-manger ?`)) return;
     await deletePantryItem(id);
+    await refresh();
+  }
+
+  async function handleAdjust(id: number, delta: number) {
+    await adjustPantryItemQuantity(id, delta);
     await refresh();
   }
 
@@ -126,6 +132,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
               onConsumeProfileChange={setConsumeProfileId}
               onConfirmConsume={() => confirmConsume(item)}
               onDelete={() => handleDelete(item.id, item.ingredient_name)}
+              onAdjust={(delta) => handleAdjust(item.id, delta)}
             />
           ))
         )}

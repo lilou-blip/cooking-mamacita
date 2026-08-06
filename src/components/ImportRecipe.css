@@ -29,6 +29,14 @@
   font-family: var(--font-body);
 }
 
+.import-recipe__url-row {
+  display: flex;
+  gap: 10px;
+}
+.import-recipe__url-row input {
+  flex: 1;
+}
+
 .import-recipe__actions {
   display: flex;
   justify-content: flex-end;

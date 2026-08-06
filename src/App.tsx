@@ -23,10 +23,12 @@ import { Menus } from "./components/Menus";
 import { Stats } from "./components/Stats";
 import { HomeTable } from "./components/HomeTable";
 import { ImportRecipe } from "./components/ImportRecipe";
+import { AiAssistant } from "./components/AiAssistant";
+import { StandaloneShoppingList } from "./components/StandaloneShoppingList";
 import type { RecipeDraft } from "./lib/ollama";
 
 type View = "toc" | "book" | "form" | "import";
-type Section = "table" | "carnet" | "pantry" | "menus" | "stats";
+type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping";
 type TurnDirection = "next" | "prev";
 
 const PAGE_TURN_MS = 220;
@@ -188,6 +190,13 @@ function App() {
     setView("form");
   }
 
+  function handleVideFrigoDraft(draft: RecipeDraft) {
+    setEditingRecipe(null);
+    setImportDraft(draft);
+    setView("form");
+    setSection("carnet");
+  }
+
   function handleCancelForm() {
     if (editingRecipe) {
       setEditingRecipe(null);
@@ -330,16 +339,26 @@ function App() {
     );
   }
 
-  return section === "table" ? (
-    <HomeTable onSelect={setSection} />
-  ) : section === "pantry" ? (
-    <PantryRoom onBack={() => setSection("table")} />
-  ) : section === "menus" ? (
-    <Menus onBack={() => setSection("table")} />
-  ) : section === "stats" ? (
-    <Stats onBack={() => setSection("table")} />
-  ) : (
-    renderCarnet()
+  return (
+    <>
+      {section === "table" ? (
+        <HomeTable onSelect={setSection} />
+      ) : section === "pantry" ? (
+        <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
+      ) : section === "menus" ? (
+        <Menus onBack={() => setSection("table")} />
+      ) : section === "stats" ? (
+        <Stats onBack={() => setSection("table")} />
+      ) : section === "shopping" ? (
+        <StandaloneShoppingList onBack={() => setSection("table")} />
+      ) : (
+        renderCarnet()
+      )}
+      <AiAssistant
+        section={section}
+        currentRecipeTitle={section === "carnet" && view === "book" ? currentRecipe?.title : undefined}
+      />
+    </>
   );
 }
 

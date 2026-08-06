@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { structureRecipeFromText, type RecipeDraft } from "../lib/ollama";
+import { fetchRecipeTextFromUrl, structureRecipeFromText, type RecipeDraft } from "../lib/ollama";
 import "./ImportRecipe.css";
 
 interface ImportRecipeProps {
@@ -9,8 +9,24 @@ interface ImportRecipeProps {
 
 export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
   const [text, setText] = useState("");
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetchingUrl, setFetchingUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleFetchUrl() {
+    if (!url.trim()) return;
+    setFetchingUrl(true);
+    setError(null);
+    try {
+      const fetchedText = await fetchRecipeTextFromUrl(url.trim());
+      setText(fetchedText);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setFetchingUrl(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,9 +47,22 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
     <form className="import-recipe" onSubmit={handleSubmit}>
       <h1>Importer une recette avec l'IA ✨</h1>
       <p className="import-recipe__hint">
-        Colle le texte d'une recette (depuis un site, une photo transcrite, etc.) et l'IA locale va la structurer
-        pour toi — titre, ingrédients, étapes et tags.
+        Colle le texte d'une recette (depuis un site, une photo transcrite, etc.), ou récupère-le automatiquement
+        depuis une URL, et l'IA locale va la structurer pour toi — titre, ingrédients, étapes et tags.
       </p>
+
+      <div className="import-recipe__url-row">
+        <input
+          type="url"
+          placeholder="https://exemple.fr/ma-recette"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          disabled={fetchingUrl || loading}
+        />
+        <button type="button" className="form-cancel" onClick={handleFetchUrl} disabled={fetchingUrl || loading || !url.trim()}>
+          {fetchingUrl ? "Récupération..." : "🔗 Récupérer le texte"}
+        </button>
+      </div>
 
       {error && <p className="form-error">{error}</p>}
 

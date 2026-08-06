@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { createStorageUnit, deleteStorageUnit, listStorageUnits, type StorageUnit } from "../lib/db";
+import { createStorageUnit, deleteStorageUnit, listPantryItems, listStorageUnits, type PantryItem, type StorageUnit } from "../lib/db";
 import { getStorageIllustration, getStorageOpenBackground } from "../lib/storageIllustrations";
+import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/ollama";
 import pantryBackground from "../assets/illustrations/pantry-background.png";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
@@ -8,16 +9,35 @@ import "./PantryRoom.css";
 
 interface PantryRoomProps {
   onBack: () => void;
+  onSuggestRecipe: (draft: RecipeDraft) => void;
 }
 
-export function PantryRoom({ onBack }: PantryRoomProps) {
+type UnitStatus = "expired" | "soon" | null;
+
+function worstStatus(items: PantryItem[], unitId: number): UnitStatus {
+  let status: UnitStatus = null;
+  for (const item of items) {
+    if (item.storage_unit_id !== unitId || !item.expires_at) continue;
+    const days = (new Date(item.expires_at).getTime() - Date.now()) / 86_400_000;
+    if (days < 0) return "expired";
+    if (days <= 3) status = "soon";
+  }
+  return status;
+}
+
+export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const [units, setUnits] = useState<StorageUnit[]>([]);
+  const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [activeUnitId, setActiveUnitId] = useState<number | "all" | null>(null);
+  const [videFrigoLoading, setVideFrigoLoading] = useState(false);
+  const [videFrigoError, setVideFrigoError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setUnits(await listStorageUnits());
+    const [unitList, itemList] = await Promise.all([listStorageUnits(), listPantryItems()]);
+    setUnits(unitList);
+    setItems(itemList);
   }, []);
 
   useEffect(() => {
@@ -31,6 +51,39 @@ export function PantryRoom({ onBack }: PantryRoomProps) {
     await createStorageUnit(input);
     setShowForm(false);
     await refresh();
+  }
+
+  async function handleVideFrigo() {
+    setVideFrigoLoading(true);
+    setVideFrigoError(null);
+    try {
+      const sorted = [...items].sort((a, b) => {
+        if (a.expires_at && b.expires_at) return a.expires_at.localeCompare(b.expires_at);
+        if (a.expires_at) return -1;
+        if (b.expires_at) return 1;
+        return 0;
+      });
+      const seen = new Set<string>();
+      const picked: { name: string; daysLeft: number | null }[] = [];
+      for (const item of sorted) {
+        const key = item.ingredient_name.trim().toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const daysLeft = item.expires_at ? (new Date(item.expires_at).getTime() - Date.now()) / 86_400_000 : null;
+        picked.push({ name: item.ingredient_name, daysLeft });
+        if (picked.length >= 12) break;
+      }
+      if (picked.length === 0) {
+        setVideFrigoError("Ton garde-manger est vide, ajoute des aliments d'abord !");
+        return;
+      }
+      const draft = await generateVideFrigoRecipe(picked);
+      onSuggestRecipe(draft);
+    } catch (err) {
+      setVideFrigoError(String(err));
+    } finally {
+      setVideFrigoLoading(false);
+    }
   }
 
   async function handleDeleteUnit(unit: StorageUnit) {
@@ -50,7 +103,10 @@ export function PantryRoom({ onBack }: PantryRoomProps) {
     return (
       <Pantry
         initialUnitId={activeUnit?.id ?? null}
-        onBack={() => setActiveUnitId(null)}
+        onBack={() => {
+          setActiveUnitId(null);
+          refresh();
+        }}
         backgroundSrc={getStorageOpenBackground(activeUnit?.illustration ?? null) ?? pantryBackground}
         title={activeUnit?.name ?? "Garde-manger"}
       />
@@ -75,11 +131,16 @@ export function PantryRoom({ onBack }: PantryRoomProps) {
         <button className="pantry-room__action" onClick={() => setShowForm(true)}>
           + Ajouter un meuble
         </button>
+        <button className="pantry-room__action" onClick={handleVideFrigo} disabled={videFrigoLoading}>
+          {videFrigoLoading ? "L'IA réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
+        </button>
       </div>
+      {videFrigoError && <p className="pantry-room__vide-frigo-error">{videFrigoError}</p>}
 
       <div className="pantry-room__floor">
         {units.map((unit) => {
           const src = getStorageIllustration(unit.illustration);
+          const status = worstStatus(items, unit.id);
           return (
             <div key={unit.id} className="pantry-room__unit">
               <button
@@ -101,6 +162,12 @@ export function PantryRoom({ onBack }: PantryRoomProps) {
                 aria-label={unit.name}
                 title={unit.name}
               >
+                {status && (
+                  <span
+                    className={`pantry-room__unit-badge pantry-room__unit-badge--${status}`}
+                    title={status === "expired" ? "Contient un aliment périmé" : "Contient un aliment bientôt périmé"}
+                  />
+                )}
                 {src ? (
                   <img src={src} alt="" className="pantry-room__unit-image" />
                 ) : (

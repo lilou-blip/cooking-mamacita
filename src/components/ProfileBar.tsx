@@ -5,8 +5,14 @@ import "./ProfileBar.css";
 
 interface ProfileBarProps {
   profiles: Profile[];
-  onAdd: (name: string, color: string, avatar: string | null) => Promise<void> | void;
-  onUpdate?: (id: number, name: string, color: string, avatar: string | null) => Promise<void> | void;
+  onAdd: (name: string, color: string, avatar: string | null, dietaryNotes: string | null) => Promise<void> | void;
+  onUpdate?: (
+    id: number,
+    name: string,
+    color: string,
+    avatar: string | null,
+    dietaryNotes: string | null,
+  ) => Promise<void> | void;
   onDelete?: (id: number) => Promise<void> | void;
   showChips?: boolean;
 }
@@ -20,12 +26,14 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
   const [name, setName] = useState("");
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [dietaryNotes, setDietaryNotes] = useState("");
   const avatarOptions = listAvatarOptions();
 
   function startAdd() {
     setName("");
     setColor(DEFAULT_COLOR);
     setAvatar(null);
+    setDietaryNotes("");
     setMode({ kind: "add" });
   }
 
@@ -33,16 +41,18 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
     setName(p.name);
     setColor(p.color);
     setAvatar(p.avatar);
+    setDietaryNotes(p.dietary_notes ?? "");
     setMode({ kind: "edit", id: p.id });
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const notes = dietaryNotes.trim() || null;
     if (mode.kind === "edit") {
-      await onUpdate?.(mode.id, name.trim(), color, avatar);
+      await onUpdate?.(mode.id, name.trim(), color, avatar, notes);
     } else {
-      await onAdd(name.trim(), color, avatar);
+      await onAdd(name.trim(), color, avatar, notes);
     }
     setMode({ kind: "none" });
   }
@@ -116,6 +126,12 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
               ))}
             </div>
           )}
+          <input
+            placeholder="Allergies / contraintes (optionnel)"
+            value={dietaryNotes}
+            onChange={(e) => setDietaryNotes(e.target.value)}
+            className="profile-bar__dietary-notes"
+          />
           <button type="submit" className="profile-bar__ok">
             OK
           </button>

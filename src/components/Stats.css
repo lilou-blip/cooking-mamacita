@@ -86,3 +86,33 @@
   font-size: 0.85rem;
   margin: 0;
 }
+
+.stats__waste-count {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--color-ink);
+  margin: 0 0 10px;
+}
+.stats__waste-value {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  color: var(--color-groseille-deep);
+  margin: 0;
+}
+.stats__estimate-waste {
+  background: var(--color-autumn-orange);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.stats__estimate-waste:hover {
+  opacity: 0.9;
+}
+.stats__estimate-waste:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

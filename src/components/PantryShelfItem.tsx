@@ -29,6 +29,7 @@ interface PantryShelfItemProps {
   onConsumeProfileChange: (value: string) => void;
   onConfirmConsume: () => void;
   onDelete: () => void;
+  onAdjust: (delta: number) => void;
 }
 
 export function PantryShelfItem({
@@ -43,6 +44,7 @@ export function PantryShelfItem({
   onConsumeProfileChange,
   onConfirmConsume,
   onDelete,
+  onAdjust,
 }: PantryShelfItemProps) {
   const src = getIngredientIllustration(item.ingredient_name);
   const status = expiryStatus(item.expires_at);
@@ -64,7 +66,33 @@ export function PantryShelfItem({
             <span className="pantry-shelf-item__initial">{item.ingredient_name.trim().charAt(0).toUpperCase()}</span>
           )}
         </span>
-        <span className="pantry-shelf-item__quantity">{formatQuantity(item)}</span>
+        <span className="pantry-shelf-item__adjust">
+          <span
+            role="button"
+            tabIndex={0}
+            className="pantry-shelf-item__adjust-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdjust(-1);
+            }}
+            aria-label="Retirer 1"
+          >
+            −
+          </span>
+          <span className="pantry-shelf-item__quantity">{formatQuantity(item)}</span>
+          <span
+            role="button"
+            tabIndex={0}
+            className="pantry-shelf-item__adjust-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdjust(1);
+            }}
+            aria-label="Ajouter 1"
+          >
+            +
+          </span>
+        </span>
         <span className="pantry-shelf-item__name">{item.ingredient_name}</span>
         {showLocation && item.storage_unit_name && (
           <span className="pantry-shelf-item__location">{item.storage_unit_name}</span>

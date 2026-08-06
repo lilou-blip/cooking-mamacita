@@ -3,6 +3,9 @@
   max-width: 800px;
   margin: 0 auto;
 }
+.menu-detail--week {
+  max-width: 1300px;
+}
 
 .menus__filters {
   display: flex;
