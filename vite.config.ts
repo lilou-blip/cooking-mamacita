@@ -24,9 +24,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Les illustrations (~7 Mo au total) ne sont PAS préchargées au premier lancement — seulement le
-        // code et les polices, pour que l'app démarre vite. Les images sont mises en cache à la demande au
-        // fur et à mesure qu'on visite les écrans (runtimeCaching ci-dessous), pas toutes d'un coup en fond.
+        // Les illustrations (~1 Mo au total, converties en WebP) ne sont PAS préchargées au premier lancement —
+        // seulement le code et les polices, pour que l'app démarre vite. Les images sont mises en cache à la
+        // demande au fur et à mesure qu'on visite les écrans (runtimeCaching ci-dessous), pas toutes d'un coup.
         globPatterns: ["**/*.{js,css,html,woff,woff2}"],
         runtimeCaching: [
           {

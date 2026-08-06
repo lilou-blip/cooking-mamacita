@@ -27,7 +27,10 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
   }, []);
 
   useEffect(() => {
-    refresh().then(() => setLoading(false));
+    (async () => {
+      await refresh();
+      setLoading(false);
+    })();
   }, [refresh]);
 
   async function handleCreate() {

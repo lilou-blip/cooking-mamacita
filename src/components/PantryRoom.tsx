@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { createStorageUnit, deleteStorageUnit, listPantryItems, listStorageUnits, type PantryItem, type StorageUnit } from "../lib/db";
 import { getStorageIllustration, getStorageOpenBackground } from "../lib/storageIllustrations";
 import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/ollama";
-import pantryBackground from "../assets/illustrations/pantry-background.png";
+import pantryBackground from "../assets/illustrations/pantry-background.webp";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
 import { ReceiptScanner } from "./ReceiptScanner";
-import { BatchCooking } from "./BatchCooking";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LoadingScreen } from "./LoadingScreen";
 import "./PantryRoom.css";
@@ -39,7 +38,6 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const [videFrigoLoading, setVideFrigoLoading] = useState(false);
   const [videFrigoError, setVideFrigoError] = useState<string | null>(null);
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
-  const [showBatchCooking, setShowBatchCooking] = useState(false);
 
   const refresh = useCallback(async () => {
     const [unitList, itemList] = await Promise.all([listStorageUnits(), listPantryItems()]);
@@ -120,18 +118,6 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
     );
   }
 
-  if (showBatchCooking) {
-    return (
-      <BatchCooking
-        onBack={() => setShowBatchCooking(false)}
-        onDone={() => {
-          setShowBatchCooking(false);
-          refresh();
-        }}
-      />
-    );
-  }
-
   if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
 
   return (
@@ -152,9 +138,6 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
         </button>
         <button className="pantry-room__action" onClick={handleVideFrigo} disabled={videFrigoLoading}>
           {videFrigoLoading ? "Mamacita réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
-        </button>
-        <button className="pantry-room__action" onClick={() => setShowBatchCooking(true)}>
-          🍲 Batch cooking
         </button>
         {isMobile && (
           <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>

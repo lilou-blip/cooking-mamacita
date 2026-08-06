@@ -1,12 +1,13 @@
-import recipeBook from "../assets/illustrations/recipe-book.png";
-import pantryBasket from "../assets/illustrations/pantry-basket.png";
-import menuCalendar from "../assets/illustrations/menu-calendar.png";
-import statsNotebook from "../assets/illustrations/stats-notebook.png";
-import shoppingListImg from "../assets/illustrations/shopping-list.png";
-import tableBackground from "../assets/illustrations/table-background.png";
+import recipeBook from "../assets/illustrations/recipe-book.webp";
+import pantryBasket from "../assets/illustrations/pantry-basket.webp";
+import menuCalendar from "../assets/illustrations/menu-calendar.webp";
+import statsNotebook from "../assets/illustrations/stats-notebook.webp";
+import shoppingListImg from "../assets/illustrations/shopping-list.webp";
+import batchCookingImg from "../assets/illustrations/batch-cooking.svg";
+import tableBackground from "../assets/illustrations/table-background.webp";
 import "./HomeTable.css";
 
-type Section = "carnet" | "pantry" | "menus" | "stats" | "shopping";
+type Section = "carnet" | "pantry" | "menus" | "stats" | "shopping" | "batch";
 
 interface HomeTableProps {
   onSelect: (section: Section) => void;
@@ -19,6 +20,7 @@ const OBJECTS: { section: Section; title: string; image: string; className: stri
   { section: "carnet", title: "Carnet de recettes", image: recipeBook, className: "home-object--carnet" },
   { section: "pantry", title: "Garde-manger", image: pantryBasket, className: "home-object--pantry" },
   { section: "menus", title: "Menus", image: menuCalendar, className: "home-object--menus" },
+  { section: "batch", title: "Batch cooking", image: batchCookingImg, className: "home-object--batch" },
   { section: "stats", title: "Statistiques", image: statsNotebook, className: "home-object--stats" },
   { section: "shopping", title: "Liste de courses", image: shoppingListImg, className: "home-object--shopping" },
 ];

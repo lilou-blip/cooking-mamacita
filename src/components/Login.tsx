@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
-import assistantAvatar from "../assets/illustrations/ai-assistant.png";
+import assistantAvatar from "../assets/illustrations/ai-assistant.webp";
 import "./Login.css";
 
 type Mode = "signin" | "signup";

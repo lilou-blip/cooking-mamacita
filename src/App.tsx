@@ -16,15 +16,8 @@ import {
 } from "./lib/db";
 import { ensureSeedRecipe } from "./lib/seed";
 import { recipeAccentColor } from "./lib/recipeAccent";
-import { BookSpread } from "./components/BookSpread";
-import { TocPage } from "./components/TocPage";
-import { RecipePreviewPage } from "./components/RecipePreviewPage";
-import { RecipeIngredientsPage } from "./components/RecipeIngredientsPage";
-import { RecipeStepsPage } from "./components/RecipeStepsPage";
-import { RecipeForm } from "./components/RecipeForm";
 import { HomeTable } from "./components/HomeTable";
 import { LoadingScreen } from "./components/LoadingScreen";
-import { ImportRecipe } from "./components/ImportRecipe";
 import { AiAssistant } from "./components/AiAssistant";
 import type { RecipeDraft } from "./lib/ollama";
 import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
@@ -35,9 +28,19 @@ const PantryRoom = lazy(() => import("./components/PantryRoom").then((m) => ({ d
 const Menus = lazy(() => import("./components/Menus").then((m) => ({ default: m.Menus })));
 const Stats = lazy(() => import("./components/Stats").then((m) => ({ default: m.Stats })));
 const ShoppingLists = lazy(() => import("./components/ShoppingLists").then((m) => ({ default: m.ShoppingLists })));
+const BatchCooking = lazy(() => import("./components/BatchCooking").then((m) => ({ default: m.BatchCooking })));
+const BookSpread = lazy(() => import("./components/BookSpread").then((m) => ({ default: m.BookSpread })));
+const TocPage = lazy(() => import("./components/TocPage").then((m) => ({ default: m.TocPage })));
+const RecipePreviewPage = lazy(() => import("./components/RecipePreviewPage").then((m) => ({ default: m.RecipePreviewPage })));
+const RecipeIngredientsPage = lazy(() =>
+  import("./components/RecipeIngredientsPage").then((m) => ({ default: m.RecipeIngredientsPage })),
+);
+const RecipeStepsPage = lazy(() => import("./components/RecipeStepsPage").then((m) => ({ default: m.RecipeStepsPage })));
+const RecipeForm = lazy(() => import("./components/RecipeForm").then((m) => ({ default: m.RecipeForm })));
+const ImportRecipe = lazy(() => import("./components/ImportRecipe").then((m) => ({ default: m.ImportRecipe })));
 
 type View = "toc" | "book" | "form" | "import";
-type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping";
+type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping" | "batch";
 type TurnDirection = "next" | "prev";
 
 const PAGE_TURN_MS = 220;
@@ -465,8 +468,12 @@ function App({ onLogout }: AppProps) {
         <Suspense fallback={<LoadingScreen />}>
           <ShoppingLists onBack={() => setSection("table")} />
         </Suspense>
+      ) : section === "batch" ? (
+        <Suspense fallback={<LoadingScreen />}>
+          <BatchCooking onBack={() => setSection("table")} onDone={() => setSection("pantry")} />
+        </Suspense>
       ) : (
-        renderCarnet()
+        <Suspense fallback={<LoadingScreen />}>{renderCarnet()}</Suspense>
       )}
       <AiAssistant
         section={section}

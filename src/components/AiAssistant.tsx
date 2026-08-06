@@ -12,12 +12,12 @@ import {
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
 import { chatWithAssistant, type AssistantMessage } from "../lib/ollama";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
-import assistantAvatar from "../assets/illustrations/ai-assistant.png";
+import assistantAvatar from "../assets/illustrations/ai-assistant.webp";
 import "./AiAssistant.css";
 
 const CATEGORY_LABEL_BY_VALUE = Object.fromEntries(INGREDIENT_CATEGORIES.map((c) => [c.value, c.label]));
 
-type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping";
+type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping" | "batch";
 
 interface AiAssistantProps {
   section: Section;
@@ -102,6 +102,8 @@ async function buildScreenContext(section: Section, currentRecipeTitle?: string)
       const uncheckedCount = items.filter((i) => !i.checked).length;
       return `L'utilisateur consulte sa liste de courses libre. Voici EXACTEMENT son contenu, n'en invente aucun autre article : ${summary}. Il reste ${uncheckedCount} article(s) non coché(s).`;
     }
+    case "batch":
+      return "L'utilisateur est sur l'écran de batch cooking, en train d'organiser une séance pour cuisiner plusieurs recettes à la fois.";
     default:
       return "L'utilisateur est sur l'écran d'accueil de l'application, il n'a encore rien ouvert.";
   }
