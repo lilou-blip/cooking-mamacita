@@ -62,7 +62,12 @@
 }
 
 .home-object img {
-  width: 300px;
+  /* Taille en vw (proportionnelle à la largeur d'écran, avec un plafond en px) plutôt qu'en px fixe : sinon
+     les objets gardent la même taille absolue à toute largeur alors que les positions (en %) rétrécissent
+     proportionnellement, et ils finissent par se chevaucher sur un écran de laptop classique (~1280-1440px)
+     alors que tout semblait correct sur un grand écran. */
+  width: 15.6vw;
+  max-width: 300px;
   height: auto;
   display: block;
   pointer-events: none;
@@ -83,7 +88,8 @@
   transform: rotate(8deg);
 }
 .home-object--pantry img {
-  width: 320px;
+  width: 16.7vw;
+  max-width: 320px;
 }
 .home-object--pantry:hover {
   transform: rotate(8deg) translateY(-8px) scale(1.05);
@@ -104,7 +110,8 @@
   transform: rotate(5deg);
 }
 .home-object--batch img {
-  width: 220px;
+  width: 11.5vw;
+  max-width: 220px;
 }
 .home-object--batch:hover {
   transform: rotate(5deg) translateY(-8px) scale(1.05);
@@ -116,7 +123,8 @@
   transform: rotate(6deg);
 }
 .home-object--stats img {
-  width: 260px;
+  width: 13.5vw;
+  max-width: 260px;
 }
 .home-object--stats:hover {
   transform: rotate(6deg) translateY(-8px) scale(1.05);
@@ -128,7 +136,8 @@
   transform: translateX(-50%) rotate(-3deg);
 }
 .home-object--shopping img {
-  width: 230px;
+  width: 12vw;
+  max-width: 230px;
 }
 .home-object--shopping:hover {
   transform: translateX(-50%) rotate(-3deg) translateY(-8px) scale(1.05);
