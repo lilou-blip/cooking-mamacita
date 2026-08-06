@@ -122,17 +122,53 @@
   transform: translateX(-50%) rotate(-3deg) translateY(-8px) scale(1.05);
 }
 
+/* En dessous de 640px, la mise en scène "objets éparpillés sur la table" (pensée pour un grand écran)
+   déborde et se chevauche : on bascule sur une liste verticale simple, centrée et scrollable. */
 @media (max-width: 640px) {
+  .home-table {
+    position: static;
+    min-height: 100vh;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 84px 20px 40px;
+  }
+
+  .home-table__topbar {
+    position: fixed;
+  }
+
   .home-table__title {
-    font-size: clamp(2rem, 8vw, 2.8rem);
+    position: static;
+    transform: none;
+    font-size: clamp(1.8rem, 9vw, 2.4rem);
     -webkit-text-stroke: 5px var(--color-cream);
+    margin: 0 0 12px;
   }
-  .home-object img {
-    width: 190px;
+
+  .home-object,
+  .home-object--carnet,
+  .home-object--pantry,
+  .home-object--menus,
+  .home-object--stats,
+  .home-object--shopping {
+    position: static;
+    transform: none;
   }
-  .home-object--pantry img {
-    width: 210px;
+  .home-object:hover,
+  .home-object--carnet:hover,
+  .home-object--pantry:hover,
+  .home-object--menus:hover,
+  .home-object--stats:hover,
+  .home-object--shopping:hover {
+    transform: none;
   }
+
+  .home-object img,
+  .home-object--pantry img,
+  .home-object--stats img,
   .home-object--shopping img {
     width: 150px;
   }
