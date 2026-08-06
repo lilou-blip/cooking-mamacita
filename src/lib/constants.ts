@@ -1,4 +1,11 @@
-import type { TagCategory } from "./db";
+import type { MealSlot, TagCategory } from "./db";
+
+export const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
+  { value: "petit_dejeuner", label: "Petit-déj" },
+  { value: "dejeuner", label: "Déjeuner" },
+  { value: "gouter", label: "Goûter" },
+  { value: "diner", label: "Dîner" },
+];
 
 export const TAG_CATEGORY_LABELS: Record<TagCategory, string> = {
   type: "Type",

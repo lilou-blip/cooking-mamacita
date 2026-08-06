@@ -1,14 +1,9 @@
 import { Fragment, useState } from "react";
 import { addRecipeToMenu, type MealSlot, type MenuFull, type MenuRecipeRow, type Recipe } from "../lib/db";
+import { MEAL_SLOTS } from "../lib/constants";
 import "./WeeklyMenuGrid.css";
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
-  { value: "petit_dejeuner", label: "Petit-déj" },
-  { value: "dejeuner", label: "Déjeuner" },
-  { value: "gouter", label: "Goûter" },
-  { value: "diner", label: "Dîner" },
-];
 
 interface WeeklyMenuGridProps {
   menu: MenuFull;
