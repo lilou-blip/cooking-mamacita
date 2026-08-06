@@ -165,6 +165,19 @@ body {
   flex-wrap: wrap;
   gap: 8px;
 }
+.made-picker__leftovers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.made-picker__leftovers input[type="number"] {
+  width: 70px;
+}
+.made-picker__leftovers-unit {
+  font-size: 0.82rem;
+  color: var(--color-ink-soft);
+}
 .made-picker__actions {
   display: flex;
   justify-content: flex-end;

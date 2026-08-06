@@ -1178,22 +1178,50 @@ export interface TopRecipeStat {
   count: number;
 }
 
+async function getGuestProfileIds(): Promise<Set<number>> {
+  return new Set((await listProfiles()).filter((p) => p.is_guest).map((p) => p.id));
+}
+
+/** Repas (consumption_log) attribués UNIQUEMENT à un ou plusieurs profils invités — à exclure de la vue
+ * "Tous" (partagé avec au moins une personne du foyer, un repas reste compté normalement). */
+async function getGuestOnlyLogIds(guestProfileIds: Set<number>): Promise<Set<number>> {
+  if (guestProfileIds.size === 0) return new Set();
+  const attributions = unwrap<{ consumption_log_id: number; profile_id: number }[]>(
+    await supabase.from("consumption_log_profiles").select("consumption_log_id, profile_id"),
+  );
+  const profilesByLog = new Map<number, number[]>();
+  for (const a of attributions) {
+    const list = profilesByLog.get(a.consumption_log_id) ?? [];
+    list.push(a.profile_id);
+    profilesByLog.set(a.consumption_log_id, list);
+  }
+  const excluded = new Set<number>();
+  for (const [logId, profIds] of profilesByLog.entries()) {
+    if (profIds.length > 0 && profIds.every((p) => guestProfileIds.has(p))) excluded.add(logId);
+  }
+  return excluded;
+}
+
 export async function getTopMadeRecipes(limit = 5, profileId?: number | null): Promise<TopRecipeStat[]> {
   let logIds: number[] | null = null;
+  let excludedLogIds = new Set<number>();
   if (profileId != null) {
     const rows = unwrap<{ consumption_log_id: number }[]>(
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
     logIds = rows.map((r) => r.consumption_log_id);
     if (logIds.length === 0) return [];
+  } else {
+    excludedLogIds = await getGuestOnlyLogIds(await getGuestProfileIds());
   }
 
-  let query = supabase.from("consumption_log").select("recipe_id, recipes(title)");
+  let query = supabase.from("consumption_log").select("id, recipe_id, recipes(title)");
   if (logIds) query = query.in("id", logIds);
-  const rows = unwrap<{ recipe_id: number; recipes: { title: string } | null }[]>(await (query as never));
+  const rows = unwrap<{ id: number; recipe_id: number; recipes: { title: string } | null }[]>(await (query as never));
 
   const counts = new Map<number, { title: string; count: number }>();
   for (const row of rows) {
+    if (excludedLogIds.has(row.id)) continue;
     const entry = counts.get(row.recipe_id) ?? { title: row.recipes?.title ?? "", count: 0 };
     entry.count += 1;
     counts.set(row.recipe_id, entry);
@@ -1255,10 +1283,7 @@ export async function getConsumptionByCategory(profileId?: number | null): Promi
     weights.set(category, (weights.get(category) ?? 0) + weighted);
   };
 
-  let guestProfileIds = new Set<number>();
-  if (profileId == null) {
-    guestProfileIds = new Set((await listProfiles()).filter((p) => p.is_guest).map((p) => p.id));
-  }
+  const guestProfileIds = profileId == null ? await getGuestProfileIds() : new Set<number>();
 
   // --- Garde-manger consommé directement (pas via une recette "faite") ---
   let pantryQuery = supabase
@@ -1302,21 +1327,8 @@ export async function getConsumptionByCategory(profileId?: number | null): Promi
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
     logIds = rows.map((r) => r.consumption_log_id);
-  } else if (guestProfileIds.size > 0) {
-    // Exclut les repas attribués UNIQUEMENT à un profil invité (partagé avec au moins une personne du
-    // foyer, il reste compté normalement).
-    const attributions = unwrap<{ consumption_log_id: number; profile_id: number }[]>(
-      await supabase.from("consumption_log_profiles").select("consumption_log_id, profile_id"),
-    );
-    const profilesByLog = new Map<number, number[]>();
-    for (const a of attributions) {
-      const list = profilesByLog.get(a.consumption_log_id) ?? [];
-      list.push(a.profile_id);
-      profilesByLog.set(a.consumption_log_id, list);
-    }
-    for (const [logId, profIds] of profilesByLog.entries()) {
-      if (profIds.length > 0 && profIds.every((p) => guestProfileIds.has(p))) excludedLogIds.add(logId);
-    }
+  } else {
+    excludedLogIds = await getGuestOnlyLogIds(guestProfileIds);
   }
 
   let logQuery = supabase.from("consumption_log").select("id, recipe_id, servings");

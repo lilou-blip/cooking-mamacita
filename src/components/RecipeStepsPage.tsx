@@ -1,4 +1,4 @@
-import type { Profile, RecipeFull } from "../lib/db";
+import type { Profile, RecipeFull, StorageUnit } from "../lib/db";
 import { SprigDoodle } from "./SprigDoodle";
 import "./BookPage.css";
 
@@ -9,8 +9,13 @@ interface RecipeStepsPageProps {
   showMadeForm: boolean;
   profiles: Profile[];
   selectedMadeProfiles: Set<number>;
+  storageUnits: StorageUnit[];
+  leftoverPortions: string;
+  leftoverStorageUnitId: number | "";
   onMarkMadeClick: () => void;
   onToggleMadeProfile: (id: number) => void;
+  onLeftoverPortionsChange: (value: string) => void;
+  onLeftoverStorageUnitIdChange: (value: number | "") => void;
   onConfirmMade: () => void;
   onCancelMadeForm: () => void;
 }
@@ -22,8 +27,13 @@ export function RecipeStepsPage({
   showMadeForm,
   profiles,
   selectedMadeProfiles,
+  storageUnits,
+  leftoverPortions,
+  leftoverStorageUnitId,
   onMarkMadeClick,
   onToggleMadeProfile,
+  onLeftoverPortionsChange,
+  onLeftoverStorageUnitIdChange,
   onConfirmMade,
   onCancelMadeForm,
 }: RecipeStepsPageProps) {
@@ -56,19 +66,49 @@ export function RecipeStepsPage({
 
       {showMadeForm && (
         <div className="made-picker">
-          <span className="made-picker__label">Qui a mangé ça ?</span>
-          <div className="made-picker__profiles">
-            {profiles.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`tag-toggle${selectedMadeProfiles.has(p.id) ? " tag-toggle--active" : ""}`}
-                onClick={() => onToggleMadeProfile(p.id)}
-              >
-                {p.name}
-              </button>
-            ))}
+          {profiles.length > 0 && (
+            <>
+              <span className="made-picker__label">Qui a mangé ça ?</span>
+              <div className="made-picker__profiles">
+                {profiles.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`tag-toggle${selectedMadeProfiles.has(p.id) ? " tag-toggle--active" : ""}`}
+                    onClick={() => onToggleMadeProfile(p.id)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <span className="made-picker__label">Il te reste des portions ? 🍲</span>
+          <div className="made-picker__leftovers">
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              placeholder="0"
+              value={leftoverPortions}
+              onChange={(e) => onLeftoverPortionsChange(e.target.value)}
+              aria-label="Portions de restes"
+            />
+            <span className="made-picker__leftovers-unit">portion(s)</span>
+            <select
+              value={leftoverStorageUnitId}
+              onChange={(e) => onLeftoverStorageUnitIdChange(e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">Emplacement</option>
+              {storageUnits.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
           </div>
+
           <div className="made-picker__actions">
             <button type="button" className="form-cancel" onClick={onCancelMadeForm}>
               Annuler

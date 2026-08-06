@@ -2,14 +2,17 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type TouchEve
 import { useIsMobile } from "./lib/useIsMobile";
 import {
   countRecipeMade,
+  createPantryItem,
   deleteRecipe,
   getRecipeById,
   listProfiles,
   listRecipesWithTags,
+  listStorageUnits,
   markRecipeMade,
   type Profile,
   type RecipeCard,
   type RecipeFull,
+  type StorageUnit,
 } from "./lib/db";
 import { ensureSeedRecipe } from "./lib/seed";
 import { recipeAccentColor } from "./lib/recipeAccent";
@@ -63,6 +66,9 @@ function App({ onLogout }: AppProps) {
   const [madeCount, setMadeCount] = useState(0);
   const [showMadeForm, setShowMadeForm] = useState(false);
   const [selectedMadeProfiles, setSelectedMadeProfiles] = useState<Set<number>>(new Set());
+  const [storageUnits, setStorageUnits] = useState<StorageUnit[]>([]);
+  const [leftoverPortions, setLeftoverPortions] = useState("");
+  const [leftoverStorageUnitId, setLeftoverStorageUnitId] = useState<number | "">("");
   const [turning, setTurning] = useState<TurnDirection | null>(null);
   const [notifPermission, setNotifPermission] = useState(notificationPermission());
   const touchStartX = useRef<number | null>(null);
@@ -86,6 +92,7 @@ function App({ onLogout }: AppProps) {
         await ensureSeedRecipe();
         await refreshRecipes();
         setProfiles(await listProfiles());
+        setStorageUnits(await listStorageUnits());
         if (notificationPermission() === "granted") checkAndNotify();
       } catch (err) {
         setError(String(err));
@@ -241,10 +248,8 @@ function App({ onLogout }: AppProps) {
   }
 
   function handleMarkMadeClick() {
-    if (profiles.length === 0) {
-      confirmMade([]);
-      return;
-    }
+    setLeftoverPortions("");
+    setLeftoverStorageUnitId("");
     setShowMadeForm(true);
   }
 
@@ -260,9 +265,25 @@ function App({ onLogout }: AppProps) {
   async function confirmMade(profileIds: number[]) {
     if (!currentRecipe) return;
     await markRecipeMade(currentRecipe.id, currentRecipe.servings, profileIds);
+
+    const portions = Number(leftoverPortions);
+    if (portions > 0) {
+      await createPantryItem({
+        ingredient_name: `Restes de ${currentRecipe.title}`,
+        ingredient_category: "autre",
+        quantity: portions,
+        unit_abbreviation: null,
+        storage_unit_id: leftoverStorageUnitId || null,
+        recipe_id: currentRecipe.id,
+        assignments: [],
+      });
+    }
+
     setMadeCount(await countRecipeMade(currentRecipe.id));
     setShowMadeForm(false);
     setSelectedMadeProfiles(new Set());
+    setLeftoverPortions("");
+    setLeftoverStorageUnitId("");
     setJustMade(true);
     setTimeout(() => setJustMade(false), 2000);
   }
@@ -312,8 +333,13 @@ function App({ onLogout }: AppProps) {
                 showMadeForm={showMadeForm}
                 profiles={profiles}
                 selectedMadeProfiles={selectedMadeProfiles}
+                storageUnits={storageUnits}
+                leftoverPortions={leftoverPortions}
+                leftoverStorageUnitId={leftoverStorageUnitId}
                 onMarkMadeClick={handleMarkMadeClick}
                 onToggleMadeProfile={toggleMadeProfile}
+                onLeftoverPortionsChange={setLeftoverPortions}
+                onLeftoverStorageUnitIdChange={setLeftoverStorageUnitId}
                 onConfirmMade={() => confirmMade(Array.from(selectedMadeProfiles))}
                 onCancelMadeForm={() => setShowMadeForm(false)}
               />
@@ -354,8 +380,13 @@ function App({ onLogout }: AppProps) {
               showMadeForm={showMadeForm}
               profiles={profiles}
               selectedMadeProfiles={selectedMadeProfiles}
+              storageUnits={storageUnits}
+              leftoverPortions={leftoverPortions}
+              leftoverStorageUnitId={leftoverStorageUnitId}
               onMarkMadeClick={handleMarkMadeClick}
               onToggleMadeProfile={toggleMadeProfile}
+              onLeftoverPortionsChange={setLeftoverPortions}
+              onLeftoverStorageUnitIdChange={setLeftoverStorageUnitId}
               onConfirmMade={() => confirmMade(Array.from(selectedMadeProfiles))}
               onCancelMadeForm={() => setShowMadeForm(false)}
             />
