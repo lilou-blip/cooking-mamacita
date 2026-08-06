@@ -65,6 +65,14 @@
 .batch-cooking__slot:hover {
   background: var(--color-blush);
 }
+.batch-cooking__slot--active {
+  background: var(--color-groseille);
+  border-color: var(--color-groseille-deep);
+  color: var(--color-white);
+}
+.batch-cooking__slot--active:hover {
+  background: var(--color-groseille-deep);
+}
 
 .batch-cooking__entries {
   list-style: none;
@@ -216,17 +224,50 @@
   gap: 4px;
 }
 
-.batch-cooking__optimize {
+.batch-cooking__optimize-block {
   background: var(--color-white);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 14px;
   margin-bottom: 18px;
 }
-.batch-cooking__optimize-actions {
+.batch-cooking__plan-header {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+}
+.batch-cooking__plan-header h2 {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  color: var(--color-groseille-deep);
+}
+.batch-cooking__refresh {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.batch-cooking__refresh:hover {
+  background: var(--color-blush);
+}
+.batch-cooking__refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.batch-cooking__storage-tip {
+  margin: -2px 0 10px;
+  font-size: 0.82rem;
+  color: var(--color-brown);
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  padding: 6px 10px;
 }
 
 .batch-cooking__ingredient-list {
@@ -259,6 +300,7 @@
 }
 
 .batch-cooking__plan {
+  list-style: decimal;
   margin: 12px 0 0;
   padding-left: 20px;
   display: flex;
@@ -266,6 +308,20 @@
   gap: 8px;
   font-size: 0.88rem;
   color: var(--color-ink);
+}
+.batch-cooking__plan-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.batch-cooking__plan-step input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.batch-cooking__plan-step--done span {
+  color: var(--color-ink-soft);
+  text-decoration: line-through;
 }
 
 .batch-cooking__actions {

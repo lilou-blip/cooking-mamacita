@@ -372,17 +372,24 @@ Si la photo est illisible ou n'est manifestement pas un ticket de caisse, répon
     }));
 }
 
+export interface BatchCookingPlan {
+  plan: string[];
+  storage: { title: string; advice: string }[];
+}
+
 /** Propose un ordre efficace pour cuisiner plusieurs recettes à la suite lors d'une séance de batch cooking
  * (fours/plaques mutualisés, préparations communes regroupées, temps d'attente d'une recette utilisés pour
- * avancer une autre...). */
+ * avancer une autre...), plus un conseil de conservation par recette (frigo/congélation, durée). */
 export async function suggestBatchCookingPlan(
   recipes: { title: string; ingredients: string[]; steps: string[] }[],
-): Promise<string[]> {
-  if (recipes.length === 0) return [];
+): Promise<BatchCookingPlan> {
+  if (recipes.length === 0) return { plan: [], storage: [] };
 
   const systemPrompt = `Tu aides à organiser une séance de batch cooking : cuisiner plusieurs recettes à la suite le plus efficacement possible (fours/plaques utilisés en parallèle, préparations communes regroupées comme couper tous les oignons en une fois, temps d'attente/cuisson d'une recette utilisés pour avancer une autre...).
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"plan": [string, ...]}
-Chaque élément de "plan" est une étape concrète et courte (une phrase), dans l'ordre à suivre pour cuisiner TOUTES les recettes ci-dessous ensemble. Entre 5 et 12 étapes, adapte le nombre à la complexité réelle. Base-toi uniquement sur les recettes fournies, n'invente pas d'ingrédient ou d'étape qui n'y figure pas.`;
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"plan": [string, ...], "storage": [{"title": string, "advice": string}, ...]}
+"plan" : étapes concrètes et courtes (une phrase chacune), dans l'ordre à suivre pour cuisiner TOUTES les recettes ci-dessous ensemble. Entre 5 et 12 étapes, adapte le nombre à la complexité réelle.
+"storage" : un objet par recette ci-dessous (reprends le titre EXACT fourni), avec un conseil de conservation court (une phrase : durée au frigo, possibilité et durée de congélation, précautions éventuelles).
+Base-toi uniquement sur les recettes fournies, n'invente pas d'ingrédient ou d'étape qui n'y figure pas.`;
 
   const recipesText = recipes
     .map(
@@ -393,9 +400,20 @@ Chaque élément de "plan" est une étape concrète et courte (une phrase), dans
     )
     .join("\n\n");
 
-  const parsed = await callAiJson(systemPrompt, recipesText, 900);
+  const parsed = await callAiJson(systemPrompt, recipesText, 1100);
   const obj = (parsed ?? {}) as Record<string, unknown>;
-  const plan = Array.isArray(obj.plan) ? obj.plan : [];
 
-  return plan.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim());
+  const planRaw = Array.isArray(obj.plan) ? obj.plan : [];
+  const plan = planRaw.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim());
+
+  const storageRaw = Array.isArray(obj.storage) ? obj.storage : [];
+  const storage = storageRaw
+    .filter((s): s is Record<string, unknown> => s != null && typeof s === "object")
+    .map((s) => ({
+      title: typeof s.title === "string" ? s.title.trim() : "",
+      advice: typeof s.advice === "string" ? s.advice.trim() : "",
+    }))
+    .filter((s) => s.title.length > 0 && s.advice.length > 0);
+
+  return { plan, storage };
 }

@@ -3,6 +3,7 @@ import {
   createPantryItem,
   getMenuById,
   getRecipeById,
+  getTopMadeRecipes,
   listMenus,
   listProfiles,
   listRecipes,
@@ -27,6 +28,8 @@ interface BatchCookingProps {
   onBack: () => void;
   onDone: () => void;
 }
+
+type Step = "slots" | "recipes" | "plan" | "store";
 
 interface StorageChunk {
   key: string;
@@ -57,8 +60,8 @@ function formatIngredientLine(ing: RecipeIngredientView): string {
 }
 
 export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
-  const [step, setStep] = useState<"slot" | "build">("slot");
-  const [slot, setSlot] = useState<MealSlot | null>(null);
+  const [step, setStep] = useState<Step>("slots");
+  const [selectedSlots, setSelectedSlots] = useState<Set<MealSlot>>(new Set());
   const [weekMenuName, setWeekMenuName] = useState<string | null>(null);
   const [entries, setEntries] = useState<BatchEntry[]>([]);
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
@@ -67,6 +70,8 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recipesError, setRecipesError] = useState<string | null>(null);
+  const [choosingForMe, setChoosingForMe] = useState(false);
 
   const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(null);
   const [recipeDetails, setRecipeDetails] = useState<Record<number, RecipeFull>>({});
@@ -77,8 +82,10 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const [plan, setPlan] = useState<string[] | null>(null);
+  const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [storageAdvice, setStorageAdvice] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -90,8 +97,16 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     })();
   }, []);
 
-  async function chooseSlot(chosen: MealSlot) {
-    setSlot(chosen);
+  function toggleSlot(s: MealSlot) {
+    setSelectedSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  }
+
+  async function goToRecipes() {
     setWeekMenuName(null);
 
     const menus = await listMenus();
@@ -102,7 +117,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
       const full = await getMenuById(weekMenu.id);
       if (full) {
         const byRecipe = new Map<number, { title: string; total: number }>();
-        for (const r of full.recipes.filter((r) => r.meal_slot === chosen)) {
+        for (const r of full.recipes.filter((r) => r.meal_slot != null && selectedSlots.has(r.meal_slot))) {
           const existing = byRecipe.get(r.recipe_id) ?? { title: r.title, total: 0 };
           existing.total += r.servings;
           byRecipe.set(r.recipe_id, existing);
@@ -119,16 +134,8 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     }
 
     setEntries(initialEntries);
-    setStep("build");
-  }
-
-  function backToSlot() {
-    setStep("slot");
-    setExpandedRecipeId(null);
-    setIngredientPreview(null);
-    setPreviewError(null);
-    setPlan(null);
-    setPlanError(null);
+    setRecipesError(null);
+    setStep("recipes");
   }
 
   function addRecipe(recipeId: number) {
@@ -138,6 +145,33 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
       ...prev,
       { recipeId, title: recipe.title, suggestedTotal: null, totalQuantity: "", chunks: [makeChunk()] },
     ]);
+  }
+
+  async function letAppChoose() {
+    setChoosingForMe(true);
+    try {
+      const top = await getTopMadeRecipes(8, null);
+      let candidateIds = top.map((t) => t.recipe_id).filter((id) => !entries.some((e) => e.recipeId === id));
+      if (candidateIds.length === 0) {
+        candidateIds = allRecipes.map((r) => r.id).filter((id) => !entries.some((e) => e.recipeId === id));
+      }
+      const chosen = candidateIds
+        .slice(0, 3)
+        .map((id) => allRecipes.find((r) => r.id === id))
+        .filter((r): r is Recipe => r != null);
+      setEntries((prev) => [
+        ...prev,
+        ...chosen.map((r) => ({
+          recipeId: r.id,
+          title: r.title,
+          suggestedTotal: null,
+          totalQuantity: String(r.servings),
+          chunks: [makeChunk()],
+        })),
+      ]);
+    } finally {
+      setChoosingForMe(false);
+    }
   }
 
   function removeEntry(recipeId: number) {
@@ -213,6 +247,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     }
     setLoadingPlan(true);
     setPlanError(null);
+    setCheckedSteps({});
     try {
       const details = await Promise.all(activeEntries.map((e) => ensureRecipeDetail(e.recipeId)));
       const payload = activeEntries
@@ -227,13 +262,37 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
         })
         .filter((p): p is { title: string; ingredients: string[]; steps: string[] } => p != null);
       const result = await suggestBatchCookingPlan(payload);
-      if (result.length === 0) setPlanError("Mamacita n'a pas réussi à générer de plan, réessaie.");
-      setPlan(result);
+      if (result.plan.length === 0) setPlanError("Mamacita n'a pas réussi à générer de plan, réessaie.");
+      setPlan(result.plan);
+      setStorageAdvice(Object.fromEntries(result.storage.map((s) => [s.title, s.advice])));
     } catch (err) {
       setPlanError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingPlan(false);
     }
+  }
+
+  function goToPlan() {
+    const active = entries.filter((e) => (Number(e.totalQuantity) || 0) > 0);
+    if (active.length === 0) {
+      setRecipesError("Indique une quantité à cuisiner pour au moins une recette.");
+      return;
+    }
+    setRecipesError(null);
+    setStep("plan");
+    void handlePreviewIngredients();
+    void handleGeneratePlan();
+  }
+
+  function toggleChecked(index: number) {
+    setCheckedSteps((prev) => ({ ...prev, [index]: !prev[index] }));
+  }
+
+  function handleBack() {
+    if (step === "slots") onBack();
+    else if (step === "recipes") setStep("slots");
+    else if (step === "plan") setStep("recipes");
+    else setStep("plan");
   }
 
   async function handleSubmit() {
@@ -270,48 +329,65 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   if (loading) return <LoadingScreen message="Chargement..." />;
 
   const availableToAdd = allRecipes.filter((r) => !entries.some((e) => e.recipeId === r.id));
-  const slotLabel = MEAL_SLOTS.find((s) => s.value === slot)?.label ?? "";
+  const slotLabels = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value)).map((s) => s.label);
+  const backLabel =
+    step === "slots" ? "← Garde-manger" : step === "recipes" ? "← Créneaux" : step === "plan" ? "← Recettes" : "← Plan";
 
   return (
     <div className="batch-cooking">
-      <button className="book-nav__back" onClick={step === "slot" ? onBack : backToSlot}>
-        {step === "slot" ? "← Garde-manger" : "← Changer de créneau"}
+      <button className="book-nav__back" onClick={handleBack}>
+        {backLabel}
       </button>
 
       <div className="batch-cooking__paper">
         <h1>🍲 Batch cooking</h1>
 
-        {step === "slot" ? (
+        {step === "slots" && (
           <>
             <p className="batch-cooking__hint">
-              Pour quel créneau repas ? S'il est déjà planifié dans le menu de la semaine, les quantités
-              seront calculées automatiquement.
+              Pour quel(s) créneau(x) repas ? Choisis-en un ou plusieurs — s'ils sont déjà planifiés dans le
+              menu de la semaine, les quantités seront calculées automatiquement.
             </p>
             <div className="batch-cooking__slots">
               {MEAL_SLOTS.map((s) => (
-                <button key={s.value} type="button" className="batch-cooking__slot" onClick={() => chooseSlot(s.value)}>
+                <button
+                  key={s.value}
+                  type="button"
+                  className={`batch-cooking__slot${selectedSlots.has(s.value) ? " batch-cooking__slot--active" : ""}`}
+                  onClick={() => toggleSlot(s.value)}
+                >
                   {s.label}
                 </button>
               ))}
             </div>
+            <div className="batch-cooking__actions">
+              <button type="button" className="form-cancel" onClick={onBack}>
+                Annuler
+              </button>
+              <button type="button" className="form-submit" onClick={goToRecipes} disabled={selectedSlots.size === 0}>
+                Continuer →
+              </button>
+            </div>
           </>
-        ) : (
+        )}
+
+        {step === "recipes" && (
           <>
             <p className="batch-cooking__hint">
               {weekMenuName
-                ? `Détecté depuis le menu "${weekMenuName}" — quantités calculées, ajustables si besoin.`
-                : `Rien de planifié pour "${slotLabel}" cette semaine — ajoute les recettes à préparer directement.`}
+                ? `Détecté depuis le menu "${weekMenuName}" (${slotLabels.join(" + ")}) — quantités calculées, ajustables si besoin.`
+                : `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — ajoute les recettes à préparer, ou laisse Mamacita choisir.`}
             </p>
-            {error && <p className="form-error">{error}</p>}
+            {recipesError && <p className="form-error">{recipesError}</p>}
 
             {entries.length === 0 && (
-              <p className="batch-cooking__empty">Aucune recette pour l'instant, ajoutes-en une ci-dessous.</p>
+              <p className="batch-cooking__empty">
+                Aucune recette pour l'instant, ajoutes-en une ci-dessous, ou laisse Mamacita choisir.
+              </p>
             )}
 
             <ul className="batch-cooking__entries">
               {entries.map((entry) => {
-                const totalChunks = entry.chunks.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
-                const target = Number(entry.totalQuantity) || 0;
                 const isExpanded = expandedRecipeId === entry.recipeId;
                 const detail = recipeDetails[entry.recipeId];
                 return (
@@ -379,6 +455,145 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                         )}
                       </div>
                     )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {availableToAdd.length > 0 && (
+              <div className="batch-cooking__add-row">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (id) addRecipe(id);
+                  }}
+                >
+                  <option value="">+ Ajouter une recette...</option>
+                  {availableToAdd.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="form-cancel" onClick={letAppChoose} disabled={choosingForMe}>
+                  {choosingForMe ? "..." : "🎲 Laisser Mamacita choisir"}
+                </button>
+              </div>
+            )}
+
+            <div className="batch-cooking__actions">
+              <button type="button" className="form-cancel" onClick={onBack}>
+                Annuler
+              </button>
+              <button type="button" className="form-submit" onClick={goToPlan}>
+                Voir le plan optimisé →
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "plan" && (
+          <>
+            <section className="batch-cooking__optimize-block">
+              <div className="batch-cooking__plan-header">
+                <h2>🧺 Ingrédients nécessaires</h2>
+                <button
+                  type="button"
+                  className="batch-cooking__refresh"
+                  onClick={handlePreviewIngredients}
+                  disabled={loadingPreview}
+                  aria-label="Recalculer les ingrédients"
+                  title="Recalculer"
+                >
+                  🔄
+                </button>
+              </div>
+              {loadingPreview && <p className="batch-cooking__hint">Calcul...</p>}
+              {previewError && <p className="form-error">{previewError}</p>}
+              {ingredientPreview && (
+                <ul className="batch-cooking__ingredient-list">
+                  {ingredientPreview.length === 0 ? (
+                    <li className="batch-cooking__empty">
+                      Indique une quantité à cuisiner pour voir les ingrédients nécessaires.
+                    </li>
+                  ) : (
+                    ingredientPreview.map((row) => (
+                      <li
+                        key={row.ingredient_name}
+                        className={`batch-cooking__ingredient${row.have_enough ? "" : " batch-cooking__ingredient--missing"}`}
+                      >
+                        <span aria-hidden="true">{row.have_enough ? "✅" : "⚠️"}</span>
+                        <span className="batch-cooking__ingredient-name">{row.ingredient_name}</span>
+                        <span className="batch-cooking__ingredient-qty">
+                          {row.quantity} {row.unit_abbreviation ?? ""}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+            </section>
+
+            <section className="batch-cooking__optimize-block">
+              <div className="batch-cooking__plan-header">
+                <h2>🪄 Plan optimisé Mamacita</h2>
+                <button
+                  type="button"
+                  className="batch-cooking__refresh"
+                  onClick={handleGeneratePlan}
+                  disabled={loadingPlan}
+                  aria-label="Régénérer le plan"
+                  title="Régénérer"
+                >
+                  🔄
+                </button>
+              </div>
+              {loadingPlan && <p className="batch-cooking__hint">Mamacita réfléchit...</p>}
+              {planError && <p className="form-error">{planError}</p>}
+              {plan && plan.length > 0 && (
+                <ol className="batch-cooking__plan">
+                  {plan.map((line, i) => (
+                    <li key={i}>
+                      <label
+                        className={`batch-cooking__plan-step${checkedSteps[i] ? " batch-cooking__plan-step--done" : ""}`}
+                      >
+                        <input type="checkbox" checked={!!checkedSteps[i]} onChange={() => toggleChecked(i)} />
+                        <span>{line}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            <div className="batch-cooking__actions">
+              <button type="button" className="form-cancel" onClick={onBack}>
+                Annuler
+              </button>
+              <button type="button" className="form-submit" onClick={() => setStep("store")}>
+                C'est cuisiné → Ranger les restes ✅
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "store" && (
+          <>
+            {error && <p className="form-error">{error}</p>}
+
+            <ul className="batch-cooking__entries">
+              {entries.map((entry) => {
+                const totalChunks = entry.chunks.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+                const target = Number(entry.totalQuantity) || 0;
+                const advice = storageAdvice[entry.title];
+                return (
+                  <li key={entry.recipeId} className="batch-cooking__entry">
+                    <div className="batch-cooking__entry-header">
+                      <span className="batch-cooking__entry-title">{entry.title}</span>
+                      <span className="batch-cooking__entry-unit">{target || 0} portion(s) à ranger</span>
+                    </div>
+                    {advice && <p className="batch-cooking__storage-tip">🧊 {advice}</p>}
 
                     <ul className="batch-cooking__chunks">
                       {entry.chunks.map((chunk) => (
@@ -475,71 +690,6 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                 );
               })}
             </ul>
-
-            {availableToAdd.length > 0 && (
-              <div className="batch-cooking__add-row">
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
-                    if (id) addRecipe(id);
-                  }}
-                >
-                  <option value="">+ Ajouter une recette...</option>
-                  {availableToAdd.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {entries.length > 0 && (
-              <div className="batch-cooking__optimize">
-                <div className="batch-cooking__optimize-actions">
-                  <button type="button" className="form-cancel" onClick={handlePreviewIngredients} disabled={loadingPreview}>
-                    {loadingPreview ? "Calcul..." : "🧺 Ingrédients nécessaires"}
-                  </button>
-                  <button type="button" className="form-cancel" onClick={handleGeneratePlan} disabled={loadingPlan}>
-                    {loadingPlan ? "Mamacita réfléchit..." : "🪄 Plan optimisé Mamacita"}
-                  </button>
-                </div>
-
-                {previewError && <p className="form-error">{previewError}</p>}
-                {ingredientPreview && (
-                  <ul className="batch-cooking__ingredient-list">
-                    {ingredientPreview.length === 0 ? (
-                      <li className="batch-cooking__empty">
-                        Indique une quantité à cuisiner pour voir les ingrédients nécessaires.
-                      </li>
-                    ) : (
-                      ingredientPreview.map((row) => (
-                        <li
-                          key={row.ingredient_name}
-                          className={`batch-cooking__ingredient${row.have_enough ? "" : " batch-cooking__ingredient--missing"}`}
-                        >
-                          <span aria-hidden="true">{row.have_enough ? "✅" : "⚠️"}</span>
-                          <span className="batch-cooking__ingredient-name">{row.ingredient_name}</span>
-                          <span className="batch-cooking__ingredient-qty">
-                            {row.quantity} {row.unit_abbreviation ?? ""}
-                          </span>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                )}
-
-                {planError && <p className="form-error">{planError}</p>}
-                {plan && plan.length > 0 && (
-                  <ol className="batch-cooking__plan">
-                    {plan.map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            )}
 
             <div className="batch-cooking__actions">
               <button type="button" className="form-cancel" onClick={onBack} disabled={saving}>

@@ -1430,6 +1430,8 @@ export interface ProfileStat {
   count: number;
 }
 
+/** Vue "Tous" uniquement (pas de paramètre profileId : cette section n'est affichée que là) — un profil
+ * invité ne doit donc jamais y apparaître, cf. getGuestOnlyLogIds. */
 export async function getConsumptionByProfile(): Promise<ProfileStat[]> {
   const [pantryRows, logProfileRows, profiles] = await Promise.all([
     supabase
@@ -1441,9 +1443,17 @@ export async function getConsumptionByProfile(): Promise<ProfileStat[]> {
     listProfiles(),
   ]);
 
+  const guestProfileIds = new Set(profiles.filter((p) => p.is_guest).map((p) => p.id));
+
   const counts = new Map<number, number>();
-  for (const row of pantryRows) counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
-  for (const row of logProfileRows) counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
+  for (const row of pantryRows) {
+    if (guestProfileIds.has(row.profile_id)) continue;
+    counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
+  }
+  for (const row of logProfileRows) {
+    if (guestProfileIds.has(row.profile_id)) continue;
+    counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
+  }
 
   const profileById = new Map(profiles.map((p) => [p.id, p]));
   return [...counts.entries()]
