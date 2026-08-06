@@ -111,3 +111,9 @@
 .toc-page__actions button {
   flex: 1;
 }
+
+@media (max-width: 640px) {
+  .toc-page__actions {
+    flex-direction: column;
+  }
+}

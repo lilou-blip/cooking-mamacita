@@ -90,4 +90,14 @@
   .book-spread__page--right {
     border-radius: 3px 3px 18px 18px;
   }
+  .book-spread__page {
+    padding: 20px 16px 24px;
+  }
+
+  /* Tant qu'aucune recette n'est choisie, la page de droite n'affiche qu'un court message : pas la peine
+     de lui donner autant de place qu'au sommaire (qui a la recherche, les filtres et la liste complète). */
+  .book-spread__page--right:has(.preview-page--empty) {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
 }
