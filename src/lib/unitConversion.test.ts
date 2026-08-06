@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createUnitConverter } from "./unitConversion";
 import type { Unit } from "./db";
 
-// Mêmes unités que celles insérées par la migration initiale (src-tauri/migrations/0001_initial.sql).
+// Mêmes unités que celles insérées par le seed par défaut (supabase/migrations/0001_initial_schema.sql).
 const UNITS: Unit[] = [
   { id: 1, name: "gramme", abbreviation: "g", unit_type: "masse", factor_to_base: 1 },
   { id: 2, name: "kilogramme", abbreviation: "kg", unit_type: "masse", factor_to_base: 1000 },

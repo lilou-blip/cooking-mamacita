@@ -1,13 +1,29 @@
-import { invoke } from "@tauri-apps/api/core";
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import { supabase } from "./supabase";
 import { listAllTags, listPantryItems, listRecipesWithTags, listUnits, type Tag, type TagCategory, type Unit } from "./db";
 import { INGREDIENT_CATEGORIES, TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "./constants";
 
-const MODEL = "llama3.2";
+/** Les erreurs d'Edge Function de supabase-js n'exposent qu'un message générique ("non-2xx status code") ;
+ * le vrai message qu'on a renvoyé nous-même est dans le corps de la réponse, accessible via error.context. */
+async function describeFunctionError(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (typeof body?.error === "string") return body.error;
+    } catch {
+      // pas de corps JSON exploitable, on retombe sur le message générique ci-dessous
+    }
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
-async function callOllamaJson(systemPrompt: string, userMessage: string, numPredict = 400): Promise<unknown> {
-  const content = await invoke<string>("ollama_chat", { systemPrompt, userMessage, model: MODEL, numPredict });
+async function callAiJson(systemPrompt: string, userMessage: string, numPredict = 400): Promise<unknown> {
+  const { data, error } = await supabase.functions.invoke<{ content: string }>("ai-proxy", {
+    body: { systemPrompt, userMessage, numPredict },
+  });
+  if (error) throw new Error(`Impossible de contacter l'IA : ${await describeFunctionError(error)}`);
   try {
-    return JSON.parse(content);
+    return JSON.parse(data!.content);
   } catch {
     throw new Error("L'IA n'a pas renvoyé un JSON valide. Réessaie.");
   }
@@ -107,13 +123,15 @@ function normalizeDraft(raw: unknown, tags: Tag[], units: Unit[]): RecipeDraft {
 
 /** Récupère le texte brut (balises HTML retirées) d'une page web, pour l'import de recette par URL. */
 export async function fetchRecipeTextFromUrl(url: string): Promise<string> {
-  return invoke<string>("fetch_recipe_text", { url });
+  const { data, error } = await supabase.functions.invoke<{ text: string }>("fetch-page", { body: { url } });
+  if (error) throw new Error(`Impossible de récupérer la page : ${await describeFunctionError(error)}`);
+  return data!.text;
 }
 
 export async function structureRecipeFromText(rawText: string): Promise<RecipeDraft> {
   const [tags, units] = await Promise.all([listAllTags(), listUnits()]);
   const systemPrompt = buildSystemPrompt(tags, units);
-  const parsed = await callOllamaJson(systemPrompt, rawText, 700);
+  const parsed = await callAiJson(systemPrompt, rawText, 700);
   return normalizeDraft(parsed, tags, units);
 }
 
@@ -133,7 +151,7 @@ Propose UNE recette simple et classique de cuisine familiale française (le genr
 Choisis SEULEMENT les ingrédients de la liste qui se marient bien ensemble dans un même plat cohérent — tu n'es pas obligé de tous les utiliser, ignore ceux qui ne conviendraient pas à la même recette (par exemple ne mélange pas un ingrédient sucré et un plat salé sauf si c'est un dessert). Complète avec des ingrédients de base courants (sel, poivre, huile, épices, oignon, ail...) si besoin.
 Le résultat doit être un plat crédible que quelqu'un cuisinerait vraiment chez soi, pas une association improbable.`;
 
-  const parsed = await callOllamaJson(systemPrompt, userMessage, 700);
+  const parsed = await callAiJson(systemPrompt, userMessage, 700);
   return normalizeDraft(parsed, tags, units);
 }
 
@@ -181,7 +199,7 @@ Nombre de personnes visé pour "servings" : ${targetServings}.
 Recettes disponibles (id | titre | tags | ingrédients déjà en stock) :
 ${recipeList}`;
 
-  const parsed = await callOllamaJson(systemPrompt, context || "Propose un menu équilibré et varié.", 300);
+  const parsed = await callAiJson(systemPrompt, context || "Propose un menu équilibré et varié.", 300);
   const obj = (parsed ?? {}) as Record<string, unknown>;
   const validIds = new Set(recipes.map((r) => r.id));
 
@@ -212,7 +230,7 @@ Réponds UNIQUEMENT avec un objet JSON valide : {"low": nombre, "high": nombre}
 "low" et "high" sont une fourchette de prix réaliste en euros pour la quantité demandée (pas juste 100g/1 unité).`;
 
   const qtyText = quantity != null ? `${quantity}${unit ? " " + unit : ""} de ` : "";
-  const parsed = await callOllamaJson(systemPrompt, `${qtyText}${ingredientName}`, 50);
+  const parsed = await callAiJson(systemPrompt, `${qtyText}${ingredientName}`, 50);
   const obj = (parsed ?? {}) as Record<string, unknown>;
 
   const low = typeof obj.low === "number" && obj.low >= 0 ? obj.low : 0;
@@ -245,7 +263,7 @@ Règle absolue : si l'utilisateur te salue, fait la conversation ou dit quelque 
   const historyText = history.map((m) => `${m.role === "user" ? "Utilisateur" : "Toi"}: ${m.content}`).join("\n");
   const fullUserMessage = historyText ? `${historyText}\nUtilisateur: ${userMessage}` : userMessage;
 
-  const parsed = await callOllamaJson(systemPrompt, fullUserMessage, 200);
+  const parsed = await callAiJson(systemPrompt, fullUserMessage, 200);
   const obj = (parsed ?? {}) as Record<string, unknown>;
 
   return typeof obj.reply === "string" && obj.reply.trim()

@@ -1,7 +1,19 @@
-# Tauri + React + Typescript
+# Cooking Mamacita
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+App web (React + TypeScript + Vite) de carnet de recettes, garde-manger, menus et courses, installable comme PWA sur mobile.
 
-## Recommended IDE Setup
+- **Backend** : [Supabase](https://supabase.com) (Postgres + Auth + Edge Functions), voir `supabase/migrations/` pour le schéma et `supabase/functions/` pour les fonctions IA (`ai-proxy`, `fetch-page`).
+- **Config locale** : copier `.env.example` en `.env.local` et renseigner l'URL et la clé publique (anon) du projet Supabase.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Développement
+
+```bash
+npm install
+npm run dev
+```
+
+## Tests
+
+```bash
+npm run test
+```

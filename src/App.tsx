@@ -37,7 +37,11 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function App() {
+interface AppProps {
+  onLogout: () => void;
+}
+
+function App({ onLogout }: AppProps) {
   const [section, setSection] = useState<Section>("table");
   const [view, setView] = useState<View>("toc");
   const [recipes, setRecipes] = useState<RecipeCard[]>([]);
@@ -342,7 +346,7 @@ function App() {
   return (
     <>
       {section === "table" ? (
-        <HomeTable onSelect={setSection} />
+        <HomeTable onSelect={setSection} onLogout={onLogout} />
       ) : section === "pantry" ? (
         <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
       ) : section === "menus" ? (

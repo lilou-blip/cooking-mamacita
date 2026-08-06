@@ -1,21 +1,11 @@
-import Database from "@tauri-apps/plugin-sql";
+import type { PostgrestError } from "@supabase/supabase-js";
+import { supabase } from "./supabase";
 import { ingredientFamily, ingredientMatchesStaple } from "./ingredientMatching";
 import { createUnitConverter } from "./unitConversion";
 
-const DB_URL = "sqlite:cooking-mamacita.db";
-
-let dbPromise: Promise<Database> | null = null;
-function getDb(): Promise<Database> {
-  if (!dbPromise) dbPromise = Database.load(DB_URL);
-  return dbPromise;
-}
-
-/** Construit la clause `VALUES ($1, $2, ...), ($colCount+1, ...), ...` d'un INSERT multi-lignes. */
-export function valuesPlaceholders(rowCount: number, colCount: number): string {
-  return Array.from({ length: rowCount }, (_, i) => {
-    const base = i * colCount;
-    return `(${Array.from({ length: colCount }, (_, j) => `$${base + j + 1}`).join(", ")})`;
-  }).join(", ");
+function unwrap<T>(result: { data: T | null; error: PostgrestError | null }): T {
+  if (result.error) throw new Error(result.error.message);
+  return result.data as T;
 }
 
 export type TagCategory = "type" | "regime" | "gout" | "saison" | "temperature";
@@ -63,8 +53,7 @@ export interface RecipeFull extends Recipe {
 }
 
 export async function listRecipes(): Promise<Recipe[]> {
-  const db = await getDb();
-  return db.select<Recipe[]>("SELECT * FROM recipes ORDER BY created_at DESC");
+  return unwrap(await supabase.from("recipes").select("*").order("created_at", { ascending: false }));
 }
 
 export interface RecipeCard extends Recipe {
@@ -74,36 +63,34 @@ export interface RecipeCard extends Recipe {
 }
 
 export async function listRecipesWithTags(): Promise<RecipeCard[]> {
-  const db = await getDb();
-  const recipes = await db.select<Recipe[]>("SELECT * FROM recipes ORDER BY created_at DESC");
+  const recipes = unwrap<Recipe[]>(await supabase.from("recipes").select("*").order("created_at", { ascending: false }));
   if (recipes.length === 0) return [];
 
-  const tagRows = await db.select<(Tag & { recipe_id: number })[]>(
-    `SELECT rt.recipe_id, t.id, t.category, t.name
-     FROM recipe_tags rt
-     JOIN tags t ON t.id = rt.tag_id`,
+  const tagRows = unwrap<{ recipe_id: number; tags: Tag | null }[]>(
+    (await supabase.from("recipe_tags").select("recipe_id, tags(id, category, name)")) as never,
   );
   const tagsByRecipe = new Map<number, Tag[]>();
   for (const row of tagRows) {
+    if (!row.tags) continue;
     const list = tagsByRecipe.get(row.recipe_id) ?? [];
-    list.push({ id: row.id, category: row.category, name: row.name });
+    list.push(row.tags);
     tagsByRecipe.set(row.recipe_id, list);
   }
 
-  const madeRows = await db.select<{ recipe_id: number; count: number }[]>(
-    "SELECT recipe_id, COUNT(*) as count FROM consumption_log GROUP BY recipe_id",
-  );
-  const madeByRecipe = new Map<number, number>(madeRows.map((r) => [r.recipe_id, r.count]));
+  const madeRows = unwrap<{ recipe_id: number }[]>(await supabase.from("consumption_log").select("recipe_id"));
+  const madeByRecipe = new Map<number, number>();
+  for (const row of madeRows) {
+    madeByRecipe.set(row.recipe_id, (madeByRecipe.get(row.recipe_id) ?? 0) + 1);
+  }
 
-  const ingredientRows = await db.select<{ recipe_id: number; name: string }[]>(
-    `SELECT ri.recipe_id, i.name
-     FROM recipe_ingredients ri
-     JOIN ingredients i ON i.id = ri.ingredient_id`,
+  const ingredientRows = unwrap<{ recipe_id: number; ingredients: { name: string } | null }[]>(
+    (await supabase.from("recipe_ingredients").select("recipe_id, ingredients(name)")) as never,
   );
   const ingredientsByRecipe = new Map<number, string[]>();
   for (const row of ingredientRows) {
+    if (!row.ingredients) continue;
     const list = ingredientsByRecipe.get(row.recipe_id) ?? [];
-    list.push(row.name);
+    list.push(row.ingredients.name);
     ingredientsByRecipe.set(row.recipe_id, list);
   }
 
@@ -116,8 +103,7 @@ export async function listRecipesWithTags(): Promise<RecipeCard[]> {
 }
 
 export async function listAllTags(): Promise<Tag[]> {
-  const db = await getDb();
-  return db.select<Tag[]>("SELECT id, category, name FROM tags ORDER BY category, name");
+  return unwrap(await supabase.from("tags").select("id, category, name").order("category").order("name"));
 }
 
 export type UnitType = "masse" | "volume" | "piece";
@@ -131,9 +117,8 @@ export interface Unit {
 }
 
 export async function listUnits(): Promise<Unit[]> {
-  const db = await getDb();
-  return db.select<Unit[]>(
-    "SELECT id, name, abbreviation, unit_type, factor_to_base FROM units ORDER BY unit_type, name",
+  return unwrap(
+    await supabase.from("units").select("id, name, abbreviation, unit_type, factor_to_base").order("unit_type").order("name"),
   );
 }
 
@@ -144,66 +129,73 @@ export interface Ingredient {
 }
 
 export async function listIngredients(): Promise<Ingredient[]> {
-  const db = await getDb();
-  return db.select<Ingredient[]>("SELECT id, name, category FROM ingredients ORDER BY name");
+  return unwrap(await supabase.from("ingredients").select("id, name, category").order("name"));
 }
 
 export async function getRecipeById(id: number): Promise<RecipeFull | null> {
-  const db = await getDb();
-
-  const recipes = await db.select<Recipe[]>("SELECT * FROM recipes WHERE id = $1", [id]);
-  const recipe = recipes[0];
+  const { data: recipe, error } = await supabase.from("recipes").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
   if (!recipe) return null;
 
-  const tags = await db.select<Tag[]>(
-    `SELECT t.id, t.category, t.name
-     FROM tags t
-     JOIN recipe_tags rt ON rt.tag_id = t.id
-     WHERE rt.recipe_id = $1`,
-    [id],
+  const tagRows = unwrap<{ tags: Tag | null }[]>(
+    (await supabase.from("recipe_tags").select("tags(id, category, name)").eq("recipe_id", id)) as never,
   );
+  const tags = tagRows.map((r) => r.tags).filter((t): t is Tag => t != null);
 
-  const ingredients = await db.select<RecipeIngredientView[]>(
-    `SELECT ri.id, ri.ingredient_id, i.name as ingredient_name, ri.quantity,
-            ri.unit_id, u.name as unit_name, u.abbreviation as unit_abbreviation,
-            ri.position, ri.note
-     FROM recipe_ingredients ri
-     JOIN ingredients i ON i.id = ri.ingredient_id
-     LEFT JOIN units u ON u.id = ri.unit_id
-     WHERE ri.recipe_id = $1
-     ORDER BY ri.position`,
-    [id],
+  const ingredientRows = unwrap<
+    {
+      id: number;
+      ingredient_id: number;
+      quantity: number | null;
+      unit_id: number | null;
+      position: number;
+      note: string | null;
+      ingredients: { name: string } | null;
+      units: { name: string; abbreviation: string } | null;
+    }[]
+  >(
+    (await supabase
+      .from("recipe_ingredients")
+      .select("id, ingredient_id, quantity, unit_id, position, note, ingredients(name), units(name, abbreviation)")
+      .eq("recipe_id", id)
+      .order("position")) as never,
   );
+  const ingredients: RecipeIngredientView[] = ingredientRows.map((r) => ({
+    id: r.id,
+    ingredient_id: r.ingredient_id,
+    ingredient_name: r.ingredients?.name ?? "",
+    quantity: r.quantity,
+    unit_id: r.unit_id,
+    unit_name: r.units?.name ?? null,
+    unit_abbreviation: r.units?.abbreviation ?? null,
+    position: r.position,
+    note: r.note,
+  }));
 
-  const steps = await db.select<RecipeStep[]>(
-    "SELECT id, step_number, instruction FROM recipe_steps WHERE recipe_id = $1 ORDER BY step_number",
-    [id],
+  const steps = unwrap<RecipeStep[]>(
+    await supabase.from("recipe_steps").select("id, step_number, instruction").eq("recipe_id", id).order("step_number"),
   );
 
   return { ...recipe, tags, ingredients, steps };
 }
 
 async function findOrCreateIngredient(name: string, category = "autre"): Promise<number> {
-  const db = await getDb();
-  const existing = await db.select<{ id: number }[]>("SELECT id FROM ingredients WHERE name = $1", [name]);
-  if (existing[0]) return existing[0].id;
-  const result = await db.execute("INSERT INTO ingredients (name, category) VALUES ($1, $2)", [name, category]);
-  return result.lastInsertId as number;
+  const { data: existing } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
+  if (existing) return existing.id;
+  const inserted = unwrap<{ id: number }>(
+    await supabase.from("ingredients").insert({ name, category }).select("id").single(),
+  );
+  return inserted.id;
 }
 
 async function findUnitByAbbreviation(abbreviation: string): Promise<number | null> {
-  const db = await getDb();
-  const rows = await db.select<{ id: number }[]>("SELECT id FROM units WHERE abbreviation = $1", [abbreviation]);
-  return rows[0]?.id ?? null;
+  const { data } = await supabase.from("units").select("id").eq("abbreviation", abbreviation).maybeSingle();
+  return data?.id ?? null;
 }
 
 async function findTagId(category: TagCategory, name: string): Promise<number | null> {
-  const db = await getDb();
-  const rows = await db.select<{ id: number }[]>(
-    "SELECT id FROM tags WHERE category = $1 AND name = $2",
-    [category, name],
-  );
-  return rows[0]?.id ?? null;
+  const { data } = await supabase.from("tags").select("id").eq("category", category).eq("name", name).maybeSingle();
+  return data?.id ?? null;
 }
 
 export interface NewRecipeIngredient {
@@ -227,16 +219,13 @@ export interface NewRecipe {
   steps: string[];
 }
 
-async function writeRecipeRelations(db: Database, recipeId: number, input: NewRecipe): Promise<void> {
+async function writeRecipeRelations(recipeId: number, input: NewRecipe): Promise<void> {
   // Résout les tags en parallèle (lectures indépendantes, aucun risque de doublon en base), puis insère
   // toutes les lignes en un seul aller-retour au lieu d'un INSERT par tag.
   const tagIds = await Promise.all(input.tags.map((tag) => findTagId(tag.category, tag.name)));
   const validTagIds = tagIds.filter((id): id is number => id !== null);
   if (validTagIds.length > 0) {
-    await db.execute(
-      `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ${valuesPlaceholders(validTagIds.length, 2)}`,
-      validTagIds.flatMap((tagId) => [recipeId, tagId]),
-    );
+    unwrap(await supabase.from("recipe_tags").insert(validTagIds.map((tagId) => ({ recipe_id: recipeId, tag_id: tagId }))));
   }
 
   // findOrCreateIngredient fait un SELECT puis un INSERT si absent : le paralléliser directement pour
@@ -258,81 +247,72 @@ async function writeRecipeRelations(db: Database, recipeId: number, input: NewRe
   const unitIdByAbbr = new Map(unitEntries);
 
   if (input.ingredients.length > 0) {
-    const params = input.ingredients.flatMap((ing, position) => [
-      recipeId,
-      ingredientIdByKey.get(`${ing.name}:${ing.category ?? "autre"}`),
-      ing.quantity,
-      ing.unit_abbreviation ? unitIdByAbbr.get(ing.unit_abbreviation) ?? null : null,
+    const rows = input.ingredients.map((ing, position) => ({
+      recipe_id: recipeId,
+      ingredient_id: ingredientIdByKey.get(`${ing.name}:${ing.category ?? "autre"}`),
+      quantity: ing.quantity,
+      unit_id: ing.unit_abbreviation ? unitIdByAbbr.get(ing.unit_abbreviation) ?? null : null,
       position,
-      ing.note ?? null,
-    ]);
-    await db.execute(
-      `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit_id, position, note)
-       VALUES ${valuesPlaceholders(input.ingredients.length, 6)}`,
-      params,
-    );
+      note: ing.note ?? null,
+    }));
+    unwrap(await supabase.from("recipe_ingredients").insert(rows));
   }
 
   if (input.steps.length > 0) {
-    const params = input.steps.flatMap((instruction, i) => [recipeId, i + 1, instruction]);
-    await db.execute(
-      `INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES ${valuesPlaceholders(input.steps.length, 3)}`,
-      params,
-    );
+    const rows = input.steps.map((instruction, i) => ({ recipe_id: recipeId, step_number: i + 1, instruction }));
+    unwrap(await supabase.from("recipe_steps").insert(rows));
   }
 }
 
 export async function createRecipe(input: NewRecipe): Promise<number> {
-  const db = await getDb();
-
-  const result = await db.execute(
-    `INSERT INTO recipes (title, photo_path, prep_time_minutes, cook_time_minutes, servings, notes, source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [
-      input.title,
-      input.photo_path ?? null,
-      input.prep_time_minutes ?? null,
-      input.cook_time_minutes ?? null,
-      input.servings,
-      input.notes ?? null,
-      input.source ?? null,
-    ],
+  const inserted = unwrap<{ id: number }>(
+    await supabase
+      .from("recipes")
+      .insert({
+        title: input.title,
+        photo_path: input.photo_path ?? null,
+        prep_time_minutes: input.prep_time_minutes ?? null,
+        cook_time_minutes: input.cook_time_minutes ?? null,
+        servings: input.servings,
+        notes: input.notes ?? null,
+        source: input.source ?? null,
+      })
+      .select("id")
+      .single(),
   );
-  const recipeId = result.lastInsertId as number;
 
-  await writeRecipeRelations(db, recipeId, input);
+  await writeRecipeRelations(inserted.id, input);
 
-  return recipeId;
+  return inserted.id;
 }
 
 export async function updateRecipe(id: number, input: NewRecipe): Promise<void> {
-  const db = await getDb();
-
-  await db.execute(
-    `UPDATE recipes SET title = $1, photo_path = $2, prep_time_minutes = $3, cook_time_minutes = $4,
-     servings = $5, notes = $6, source = $7 WHERE id = $8`,
-    [
-      input.title,
-      input.photo_path ?? null,
-      input.prep_time_minutes ?? null,
-      input.cook_time_minutes ?? null,
-      input.servings,
-      input.notes ?? null,
-      input.source ?? null,
-      id,
-    ],
+  unwrap(
+    await supabase
+      .from("recipes")
+      .update({
+        title: input.title,
+        photo_path: input.photo_path ?? null,
+        prep_time_minutes: input.prep_time_minutes ?? null,
+        cook_time_minutes: input.cook_time_minutes ?? null,
+        servings: input.servings,
+        notes: input.notes ?? null,
+        source: input.source ?? null,
+      })
+      .eq("id", id),
   );
 
-  await db.execute("DELETE FROM recipe_tags WHERE recipe_id = $1", [id]);
-  await db.execute("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [id]);
-  await db.execute("DELETE FROM recipe_steps WHERE recipe_id = $1", [id]);
+  await Promise.all([
+    supabase.from("recipe_tags").delete().eq("recipe_id", id),
+    supabase.from("recipe_ingredients").delete().eq("recipe_id", id),
+    supabase.from("recipe_steps").delete().eq("recipe_id", id),
+  ]);
 
-  await writeRecipeRelations(db, id, input);
+  await writeRecipeRelations(id, input);
 }
 
 export async function deleteRecipe(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM recipes WHERE id = $1", [id]);
+  unwrap(await supabase.from("recipes").delete().eq("id", id));
 }
 
 export interface Profile {
@@ -345,9 +325,8 @@ export interface Profile {
 }
 
 export async function listProfiles(): Promise<Profile[]> {
-  const db = await getDb();
-  return db.select<Profile[]>(
-    "SELECT id, name, color, relation, avatar, dietary_notes FROM consumer_profiles ORDER BY created_at",
+  return unwrap(
+    await supabase.from("consumer_profiles").select("id, name, color, relation, avatar, dietary_notes").order("created_at"),
   );
 }
 
@@ -358,32 +337,46 @@ export async function createProfile(input: {
   avatar?: string | null;
   dietary_notes?: string | null;
 }): Promise<number> {
-  const db = await getDb();
-  const result = await db.execute(
-    "INSERT INTO consumer_profiles (name, color, relation, avatar, dietary_notes) VALUES ($1, $2, $3, $4, $5)",
-    [input.name, input.color, input.relation ?? null, input.avatar ?? null, input.dietary_notes ?? null],
+  const inserted = unwrap<{ id: number }>(
+    await supabase
+      .from("consumer_profiles")
+      .insert({
+        name: input.name,
+        color: input.color,
+        relation: input.relation ?? null,
+        avatar: input.avatar ?? null,
+        dietary_notes: input.dietary_notes ?? null,
+      })
+      .select("id")
+      .single(),
   );
-  return result.lastInsertId as number;
+  return inserted.id;
 }
 
 export async function updateProfile(
   id: number,
   input: { name: string; color: string; relation?: string | null; avatar?: string | null; dietary_notes?: string | null },
 ): Promise<void> {
-  const db = await getDb();
-  await db.execute(
-    "UPDATE consumer_profiles SET name = $1, color = $2, relation = $3, avatar = $4, dietary_notes = $5 WHERE id = $6",
-    [input.name, input.color, input.relation ?? null, input.avatar ?? null, input.dietary_notes ?? null, id],
+  unwrap(
+    await supabase
+      .from("consumer_profiles")
+      .update({
+        name: input.name,
+        color: input.color,
+        relation: input.relation ?? null,
+        avatar: input.avatar ?? null,
+        dietary_notes: input.dietary_notes ?? null,
+      })
+      .eq("id", id),
   );
 }
 
 /** Supprime un profil et nettoie ses références (assignations garde-manger, associations de consommation). */
 export async function deleteProfile(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM pantry_item_assignments WHERE profile_id = $1", [id]);
-  await db.execute("DELETE FROM consumption_log_profiles WHERE profile_id = $1", [id]);
-  await db.execute("UPDATE pantry_consumption_log SET profile_id = NULL WHERE profile_id = $1", [id]);
-  await db.execute("DELETE FROM consumer_profiles WHERE id = $1", [id]);
+  await supabase.from("pantry_item_assignments").delete().eq("profile_id", id);
+  await supabase.from("consumption_log_profiles").delete().eq("profile_id", id);
+  await supabase.from("pantry_consumption_log").update({ profile_id: null }).eq("profile_id", id);
+  await supabase.from("consumer_profiles").delete().eq("id", id);
 }
 
 export interface PantryAssignment {
@@ -401,25 +394,26 @@ export interface StorageUnit {
 }
 
 export async function listStorageUnits(): Promise<StorageUnit[]> {
-  const db = await getDb();
-  return db.select<StorageUnit[]>("SELECT id, name, illustration, position FROM storage_units ORDER BY position, id");
+  return unwrap(await supabase.from("storage_units").select("id, name, illustration, position").order("position").order("id"));
 }
 
 export async function createStorageUnit(input: { name: string; illustration: string | null }): Promise<number> {
-  const db = await getDb();
-  const rows = await db.select<{ max_position: number | null }[]>("SELECT MAX(position) as max_position FROM storage_units");
-  const position = (rows[0]?.max_position ?? -1) + 1;
-  const result = await db.execute(
-    "INSERT INTO storage_units (name, illustration, position) VALUES ($1, $2, $3)",
-    [input.name, input.illustration, position],
+  const { data: maxRow } = await supabase
+    .from("storage_units")
+    .select("position")
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = (maxRow?.position ?? -1) + 1;
+  const inserted = unwrap<{ id: number }>(
+    await supabase.from("storage_units").insert({ name: input.name, illustration: input.illustration, position }).select("id").single(),
   );
-  return result.lastInsertId as number;
+  return inserted.id;
 }
 
 export async function deleteStorageUnit(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("UPDATE pantry_items SET storage_unit_id = NULL WHERE storage_unit_id = $1", [id]);
-  await db.execute("DELETE FROM storage_units WHERE id = $1", [id]);
+  await supabase.from("pantry_items").update({ storage_unit_id: null }).eq("storage_unit_id", id);
+  await supabase.from("storage_units").delete().eq("id", id);
 }
 
 export interface PantryItem {
@@ -439,31 +433,56 @@ export interface PantryItem {
 }
 
 export async function listPantryItems(): Promise<PantryItem[]> {
-  const db = await getDb();
-  const items = await db.select<Omit<PantryItem, "assignments">[]>(
-    `SELECT p.id, p.ingredient_id, i.name as ingredient_name, i.category as ingredient_category, p.quantity,
-            p.unit_id, u.name as unit_name, u.abbreviation as unit_abbreviation,
-            p.added_at, p.expires_at, p.storage_unit_id, su.name as storage_unit_name
-     FROM pantry_items p
-     JOIN ingredients i ON i.id = p.ingredient_id
-     LEFT JOIN units u ON u.id = p.unit_id
-     LEFT JOIN storage_units su ON su.id = p.storage_unit_id
-     ORDER BY (p.expires_at IS NULL), p.expires_at ASC, i.name ASC`,
+  const rows = unwrap<
+    {
+      id: number;
+      ingredient_id: number;
+      unit_id: number | null;
+      quantity: number;
+      added_at: string;
+      expires_at: string | null;
+      storage_unit_id: number | null;
+      ingredients: { name: string; category: string } | null;
+      units: { name: string; abbreviation: string } | null;
+      storage_units: { name: string } | null;
+    }[]
+  >(
+    (await supabase
+      .from("pantry_items")
+      .select(
+        "id, ingredient_id, unit_id, quantity, added_at, expires_at, storage_unit_id, ingredients(name, category), units(name, abbreviation), storage_units(name)",
+      )
+      .order("expires_at", { ascending: true, nullsFirst: false })
+      .order("name", { foreignTable: "ingredients", ascending: true })) as never,
   );
+
+  const items: Omit<PantryItem, "assignments">[] = rows.map((r) => ({
+    id: r.id,
+    ingredient_id: r.ingredient_id,
+    ingredient_name: r.ingredients?.name ?? "",
+    ingredient_category: r.ingredients?.category ?? "autre",
+    quantity: r.quantity,
+    unit_id: r.unit_id,
+    unit_name: r.units?.name ?? null,
+    unit_abbreviation: r.units?.abbreviation ?? null,
+    added_at: r.added_at,
+    expires_at: r.expires_at,
+    storage_unit_id: r.storage_unit_id,
+    storage_unit_name: r.storage_units?.name ?? null,
+  }));
   if (items.length === 0) return [];
 
-  const assignRows = await db.select<(PantryAssignment & { pantry_item_id: number })[]>(
-    `SELECT a.pantry_item_id, a.quantity, pr.id as profile_id, pr.name as profile_name, pr.color as profile_color
-     FROM pantry_item_assignments a
-     JOIN consumer_profiles pr ON pr.id = a.profile_id`,
-  );
+  const assignRows = unwrap<
+    { pantry_item_id: number; quantity: number; consumer_profiles: { id: number; name: string; color: string } | null }[]
+  >((await supabase.from("pantry_item_assignments").select("pantry_item_id, quantity, consumer_profiles(id, name, color)")) as never);
   const byItem = new Map<number, PantryAssignment[]>();
   for (const row of assignRows) {
+    if (!row.consumer_profiles) continue;
     const list = byItem.get(row.pantry_item_id) ?? [];
     list.push({
-      profile_id: row.profile_id,
-      profile_name: row.profile_name,
-      profile_color: row.profile_color,
+      profile_id: row.consumer_profiles.id,
+      profile_name: row.consumer_profiles.name,
+      profile_color: row.consumer_profiles.color,
       quantity: row.quantity,
     });
     byItem.set(row.pantry_item_id, list);
@@ -483,98 +502,101 @@ export interface NewPantryItem {
 }
 
 export async function createPantryItem(input: NewPantryItem): Promise<number> {
-  const db = await getDb();
   const ingredientId = await findOrCreateIngredient(input.ingredient_name, input.ingredient_category ?? "autre");
   const unitId = input.unit_abbreviation ? await findUnitByAbbreviation(input.unit_abbreviation) : null;
 
-  const result = await db.execute(
-    "INSERT INTO pantry_items (ingredient_id, unit_id, quantity, expires_at, storage_unit_id) VALUES ($1, $2, $3, $4, $5)",
-    [ingredientId, unitId, input.quantity, input.expires_at ?? null, input.storage_unit_id ?? null],
+  const inserted = unwrap<{ id: number }>(
+    await supabase
+      .from("pantry_items")
+      .insert({
+        ingredient_id: ingredientId,
+        unit_id: unitId,
+        quantity: input.quantity,
+        expires_at: input.expires_at ?? null,
+        storage_unit_id: input.storage_unit_id ?? null,
+      })
+      .select("id")
+      .single(),
   );
-  const pantryItemId = result.lastInsertId as number;
+  const pantryItemId = inserted.id;
 
-  for (const assignment of input.assignments) {
-    if (assignment.quantity > 0) {
-      await db.execute(
-        "INSERT INTO pantry_item_assignments (pantry_item_id, profile_id, quantity) VALUES ($1, $2, $3)",
-        [pantryItemId, assignment.profile_id, assignment.quantity],
-      );
-    }
+  const assignmentRows = input.assignments
+    .filter((a) => a.quantity > 0)
+    .map((a) => ({ pantry_item_id: pantryItemId, profile_id: a.profile_id, quantity: a.quantity }));
+  if (assignmentRows.length > 0) {
+    unwrap(await supabase.from("pantry_item_assignments").insert(assignmentRows));
   }
 
   return pantryItemId;
 }
 
 export async function deletePantryItem(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM pantry_items WHERE id = $1", [id]);
+  unwrap(await supabase.from("pantry_items").delete().eq("id", id));
 }
 
 /** Ajuste rapidement la quantité d'un article (+1/-1...) sans passer par le formulaire de consommation. Supprime l'article si la quantité tombe à 0. */
 export async function adjustPantryItemQuantity(id: number, delta: number): Promise<void> {
-  const db = await getDb();
-  const rows = await db.select<{ quantity: number }[]>("SELECT quantity FROM pantry_items WHERE id = $1", [id]);
-  const current = rows[0]?.quantity ?? 0;
+  const { data } = await supabase.from("pantry_items").select("quantity").eq("id", id).maybeSingle();
+  const current = data?.quantity ?? 0;
   const next = Math.round((current + delta) * 100) / 100;
   if (next <= 0) {
-    await db.execute("DELETE FROM pantry_items WHERE id = $1", [id]);
+    await supabase.from("pantry_items").delete().eq("id", id);
   } else {
-    await db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [next, id]);
+    await supabase.from("pantry_items").update({ quantity: next }).eq("id", id);
   }
 }
 
 /** Réduit la quantité d'un article du garde-manger et journalise qui l'a consommé. Supprime la ligne si elle atteint 0. */
-export async function consumePantryItem(
-  id: number,
-  quantityConsumed: number,
-  profileId?: number | null,
-): Promise<void> {
-  const db = await getDb();
-  const rows = await db.select<{ quantity: number; ingredient_id: number; unit_id: number | null; expires_at: string | null }[]>(
-    "SELECT quantity, ingredient_id, unit_id, expires_at FROM pantry_items WHERE id = $1",
-    [id],
-  );
-  const item = rows[0];
+export async function consumePantryItem(id: number, quantityConsumed: number, profileId?: number | null): Promise<void> {
+  const { data: item } = await supabase
+    .from("pantry_items")
+    .select("quantity, ingredient_id, unit_id, expires_at")
+    .eq("id", id)
+    .maybeSingle();
   if (!item) return;
 
   const remaining = Math.round((item.quantity - quantityConsumed) * 100) / 100;
   if (remaining <= 0) {
-    await db.execute("DELETE FROM pantry_items WHERE id = $1", [id]);
+    await supabase.from("pantry_items").delete().eq("id", id);
   } else {
-    await db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [remaining, id]);
+    await supabase.from("pantry_items").update({ quantity: remaining }).eq("id", id);
   }
 
-  await db.execute(
-    "INSERT INTO pantry_consumption_log (ingredient_id, profile_id, quantity, unit_id) VALUES ($1, $2, $3, $4)",
-    [item.ingredient_id, profileId ?? null, quantityConsumed, item.unit_id],
-  );
+  await supabase.from("pantry_consumption_log").insert({
+    ingredient_id: item.ingredient_id,
+    profile_id: profileId ?? null,
+    quantity: quantityConsumed,
+    unit_id: item.unit_id,
+  });
 
   // Aliment consommé alors qu'il était proche de la péremption (ou déjà périmé) : gaspillage évité, on le journalise pour les stats éco.
   if (item.expires_at) {
     const daysLeft = (new Date(item.expires_at).getTime() - Date.now()) / 86_400_000;
     if (daysLeft <= 3) {
-      await db.execute(
-        "INSERT INTO pantry_waste_avoided_log (ingredient_id, quantity, unit_id) VALUES ($1, $2, $3)",
-        [item.ingredient_id, quantityConsumed, item.unit_id],
-      );
+      await supabase.from("pantry_waste_avoided_log").insert({
+        ingredient_id: item.ingredient_id,
+        quantity: quantityConsumed,
+        unit_id: item.unit_id,
+      });
     }
   }
 }
 
 /** Déduit du garde-manger les ingrédients d'une recette, en piochant d'abord dans les articles qui expirent le plus tôt. */
-async function deductRecipeFromPantry(db: Database, ingredients: RecipeIngredientView[], scale: number): Promise<void> {
+async function deductRecipeFromPantry(ingredients: RecipeIngredientView[], scale: number): Promise<void> {
   const relevant = ingredients.filter((ing) => ing.quantity != null);
 
   // Lecture : une requête par ingrédient, mais indépendantes les unes des autres -> en parallèle.
   const pantryRowsByIngredient = await Promise.all(
-    relevant.map((ing) =>
-      db.select<{ id: number; quantity: number }[]>(
-        `SELECT id, quantity FROM pantry_items
-         WHERE ingredient_id = $1 AND unit_id IS $2
-         ORDER BY (expires_at IS NULL), expires_at ASC`,
-        [ing.ingredient_id, ing.unit_id],
-      ),
-    ),
+    relevant.map(async (ing) => {
+      let query = supabase
+        .from("pantry_items")
+        .select("id, quantity")
+        .eq("ingredient_id", ing.ingredient_id)
+        .order("expires_at", { ascending: true, nullsFirst: false });
+      query = ing.unit_id == null ? query.is("unit_id", null) : query.eq("unit_id", ing.unit_id);
+      return unwrap<{ id: number; quantity: number }[]>(await query);
+    }),
   );
 
   // Calcul pur (aucun accès DB) : détermine, pour chaque article pioché, s'il faut le supprimer ou juste
@@ -593,42 +615,41 @@ async function deductRecipeFromPantry(db: Database, ingredients: RecipeIngredien
   await Promise.all(
     mutations.map((m) =>
       m.remaining <= 0
-        ? db.execute("DELETE FROM pantry_items WHERE id = $1", [m.id])
-        : db.execute("UPDATE pantry_items SET quantity = $1 WHERE id = $2", [m.remaining, m.id]),
+        ? supabase.from("pantry_items").delete().eq("id", m.id)
+        : supabase.from("pantry_items").update({ quantity: m.remaining }).eq("id", m.id),
     ),
   );
 }
 
 export async function countRecipeMade(recipeId: number): Promise<number> {
-  const db = await getDb();
-  const rows = await db.select<{ count: number }[]>(
-    "SELECT COUNT(*) as count FROM consumption_log WHERE recipe_id = $1",
-    [recipeId],
-  );
-  return rows[0]?.count ?? 0;
+  const { count, error } = await supabase
+    .from("consumption_log")
+    .select("id", { count: "exact", head: true })
+    .eq("recipe_id", recipeId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
 /** Marque une recette comme faite: journalise la consommation (liée aux profils) et déduit le garde-manger. */
 export async function markRecipeMade(recipeId: number, servings: number, profileIds: number[] = []): Promise<void> {
-  const db = await getDb();
   const recipe = await getRecipeById(recipeId);
   if (!recipe) throw new Error("Recette introuvable");
 
-  const result = await db.execute("INSERT INTO consumption_log (recipe_id, servings) VALUES ($1, $2)", [
-    recipeId,
-    servings,
-  ]);
-  const logId = result.lastInsertId as number;
+  const inserted = unwrap<{ id: number }>(
+    await supabase.from("consumption_log").insert({ recipe_id: recipeId, servings }).select("id").single(),
+  );
+  const logId = inserted.id;
 
   if (profileIds.length > 0) {
-    await db.execute(
-      `INSERT INTO consumption_log_profiles (consumption_log_id, profile_id) VALUES ${valuesPlaceholders(profileIds.length, 2)}`,
-      profileIds.flatMap((profileId) => [logId, profileId]),
+    unwrap(
+      await supabase
+        .from("consumption_log_profiles")
+        .insert(profileIds.map((profileId) => ({ consumption_log_id: logId, profile_id: profileId }))),
     );
   }
 
   const scale = recipe.servings > 0 ? servings / recipe.servings : 1;
-  await deductRecipeFromPantry(db, recipe.ingredients, scale);
+  await deductRecipeFromPantry(recipe.ingredients, scale);
 }
 
 export type MenuType = "semaine" | "evenement";
@@ -644,9 +665,12 @@ export interface Menu {
 }
 
 export async function listMenus(): Promise<Menu[]> {
-  const db = await getDb();
-  return db.select<Menu[]>(
-    "SELECT * FROM menus ORDER BY (event_date IS NULL), event_date ASC, created_at DESC",
+  return unwrap(
+    await supabase
+      .from("menus")
+      .select("*")
+      .order("event_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
   );
 }
 
@@ -657,23 +681,24 @@ export async function createMenu(input: {
   servings_target?: number | null;
   notes?: string | null;
 }): Promise<number> {
-  const db = await getDb();
-  const result = await db.execute(
-    "INSERT INTO menus (name, menu_type, event_date, servings_target, notes) VALUES ($1, $2, $3, $4, $5)",
-    [
-      input.name,
-      input.menu_type ?? "evenement",
-      input.event_date ?? null,
-      input.servings_target ?? null,
-      input.notes ?? null,
-    ],
+  const inserted = unwrap<{ id: number }>(
+    await supabase
+      .from("menus")
+      .insert({
+        name: input.name,
+        menu_type: input.menu_type ?? "evenement",
+        event_date: input.event_date ?? null,
+        servings_target: input.servings_target ?? null,
+        notes: input.notes ?? null,
+      })
+      .select("id")
+      .single(),
   );
-  return result.lastInsertId as number;
+  return inserted.id;
 }
 
 export async function deleteMenu(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM menus WHERE id = $1", [id]);
+  unwrap(await supabase.from("menus").delete().eq("id", id));
 }
 
 export type MealSlot = "petit_dejeuner" | "dejeuner" | "gouter" | "diner";
@@ -694,28 +719,44 @@ export interface MenuFull extends Menu {
 }
 
 export async function getMenuById(id: number): Promise<MenuFull | null> {
-  const db = await getDb();
-  const menus = await db.select<Menu[]>("SELECT * FROM menus WHERE id = $1", [id]);
-  const menu = menus[0];
+  const { data: menu, error } = await supabase.from("menus").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
   if (!menu) return null;
 
-  const rawRecipes = await db.select<(Omit<MenuRecipeRow, "made"> & { made: number })[]>(
-    `SELECT mr.id as menu_recipe_id, mr.recipe_id, r.title, r.photo_path, mr.servings, mr.made,
-            mr.day_of_week, mr.meal_slot
-     FROM menu_recipes mr
-     JOIN recipes r ON r.id = mr.recipe_id
-     WHERE mr.menu_id = $1
-     ORDER BY mr.id`,
-    [id],
+  const rows = unwrap<
+    {
+      id: number;
+      recipe_id: number;
+      servings: number;
+      made: boolean;
+      day_of_week: number | null;
+      meal_slot: MealSlot | null;
+      recipes: { title: string; photo_path: string | null } | null;
+    }[]
+  >(
+    (await supabase
+      .from("menu_recipes")
+      .select("id, recipe_id, servings, made, day_of_week, meal_slot, recipes(title, photo_path)")
+      .eq("menu_id", id)
+      .order("id")) as never,
   );
-  const recipes: MenuRecipeRow[] = rawRecipes.map((r) => ({ ...r, made: !!r.made }));
+
+  const recipes: MenuRecipeRow[] = rows.map((r) => ({
+    menu_recipe_id: r.id,
+    recipe_id: r.recipe_id,
+    title: r.recipes?.title ?? "",
+    photo_path: r.recipes?.photo_path ?? null,
+    servings: r.servings,
+    made: r.made,
+    day_of_week: r.day_of_week,
+    meal_slot: r.meal_slot,
+  }));
 
   return { ...menu, recipes };
 }
 
 export async function updateMenuRecipeMade(menuRecipeId: number, made: boolean): Promise<void> {
-  const db = await getDb();
-  await db.execute("UPDATE menu_recipes SET made = $1 WHERE id = $2", [made ? 1 : 0, menuRecipeId]);
+  unwrap(await supabase.from("menu_recipes").update({ made }).eq("id", menuRecipeId));
 }
 
 export async function addRecipeToMenu(
@@ -725,16 +766,19 @@ export async function addRecipeToMenu(
   dayOfWeek?: number | null,
   mealSlot?: MealSlot | null,
 ): Promise<void> {
-  const db = await getDb();
-  await db.execute(
-    "INSERT INTO menu_recipes (menu_id, recipe_id, servings, day_of_week, meal_slot) VALUES ($1, $2, $3, $4, $5)",
-    [menuId, recipeId, servings, dayOfWeek ?? null, mealSlot ?? null],
+  unwrap(
+    await supabase.from("menu_recipes").insert({
+      menu_id: menuId,
+      recipe_id: recipeId,
+      servings,
+      day_of_week: dayOfWeek ?? null,
+      meal_slot: mealSlot ?? null,
+    }),
   );
 }
 
 export async function removeMenuRecipe(menuRecipeId: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM menu_recipes WHERE id = $1", [menuRecipeId]);
+  unwrap(await supabase.from("menu_recipes").delete().eq("id", menuRecipeId));
 }
 
 export interface ShoppingList {
@@ -763,14 +807,19 @@ export interface ShoppingListFull extends ShoppingList {
 
 /** Renvoie l'unique liste de courses "libre" (sans menu associé), utilisée depuis la table, en la créant si besoin. */
 export async function getOrCreateStandaloneShoppingList(): Promise<number> {
-  const db = await getDb();
-  const existing = await db.select<{ id: number }[]>(
-    "SELECT id FROM shopping_lists WHERE menu_id IS NULL ORDER BY created_at ASC LIMIT 1",
-  );
-  if (existing[0]) return existing[0].id;
+  const { data: existing } = await supabase
+    .from("shopping_lists")
+    .select("id")
+    .is("menu_id", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing.id;
 
-  const result = await db.execute("INSERT INTO shopping_lists (menu_id, name) VALUES (NULL, $1)", ["Liste de courses"]);
-  return result.lastInsertId as number;
+  const inserted = unwrap<{ id: number }>(
+    await supabase.from("shopping_lists").insert({ menu_id: null, name: "Liste de courses" }).select("id").single(),
+  );
+  return inserted.id;
 }
 
 /** Produits de base qu'on veut se voir suggérer dès qu'il en reste peu, même s'ils ne sont pas requis par le menu. */
@@ -784,7 +833,6 @@ const STAPLE_DEFAULTS: { name: string; category: string; quantity: number; unitA
 ];
 
 export async function generateShoppingListForMenu(menuId: number): Promise<number> {
-  const db = await getDb();
   const menu = await getMenuById(menuId);
   if (!menu) throw new Error("Menu introuvable");
 
@@ -817,21 +865,20 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
     }
   });
 
-  const pantryRows = await db.select<{ ingredient_id: number; unit_id: number | null; total: number }[]>(
-    "SELECT ingredient_id, unit_id, SUM(quantity) as total FROM pantry_items GROUP BY ingredient_id, unit_id",
+  const pantryRows = unwrap<{ ingredient_id: number; unit_id: number | null; quantity: number }[]>(
+    await supabase.from("pantry_items").select("ingredient_id, unit_id, quantity"),
   );
   const pantryBaseByKey = new Map<string, number>();
   for (const row of pantryRows) {
-    const baseQty = toBase(row.total, row.unit_id);
+    const baseQty = toBase(row.quantity, row.unit_id);
     const key = `${row.ingredient_id}:${unitTypeOf(row.unit_id)}`;
     pantryBaseByKey.set(key, (pantryBaseByKey.get(key) ?? 0) + baseQty);
   }
 
-  const result = await db.execute("INSERT INTO shopping_lists (menu_id, name) VALUES ($1, $2)", [
-    menuId,
-    `Courses – ${menu.name}`,
-  ]);
-  const shoppingListId = result.lastInsertId as number;
+  const insertedList = unwrap<{ id: number }>(
+    await supabase.from("shopping_lists").insert({ menu_id: menuId, name: `Courses – ${menu.name}` }).select("id").single(),
+  );
+  const shoppingListId = insertedList.id;
 
   const addedIngredientIds = new Set<number>();
 
@@ -854,9 +901,10 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
   }
 
   if (missingRows.length > 0) {
-    await db.execute(
-      `INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id) VALUES ${valuesPlaceholders(missingRows.length, 4)}`,
-      missingRows.flatMap((r) => [shoppingListId, r.ingredientId, r.quantity, r.unitId]),
+    unwrap(
+      await supabase
+        .from("shopping_list_items")
+        .insert(missingRows.map((r) => ({ shopping_list_id: shoppingListId, ingredient_id: r.ingredientId, quantity: r.quantity, unit_id: r.unitId }))),
     );
   }
 
@@ -885,10 +933,16 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
   );
 
   if (staplesToInsert.length > 0) {
-    await db.execute(
-      `INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id, is_suggested)
-       VALUES ${valuesPlaceholders(staplesToInsert.length, 5)}`,
-      staplesToInsert.flatMap((s) => [shoppingListId, s.canonicalId, s.quantity, s.unitId, 1]),
+    unwrap(
+      await supabase.from("shopping_list_items").insert(
+        staplesToInsert.map((s) => ({
+          shopping_list_id: shoppingListId,
+          ingredient_id: s.canonicalId,
+          quantity: s.quantity,
+          unit_id: s.unitId,
+          is_suggested: true,
+        })),
+      ),
     );
   }
 
@@ -899,21 +953,21 @@ export async function generateShoppingListForMenu(menuId: number): Promise<numbe
 
 /** Fusionne les articles en double d'une liste de courses (ex: "2 œufs" + "1 œuf" -> "3 œufs", "beurre mou" + "beurre" -> "beurre"). */
 export async function mergeDuplicateShoppingListItems(shoppingListId: number): Promise<void> {
-  const db = await getDb();
   const units = await listUnits();
   const { unitById, unitTypeOf, toBase } = createUnitConverter(units);
 
-  const rows = await db.select<
-    { id: number; ingredient_id: number; ingredient_name: string; quantity: number | null; unit_id: number | null; is_suggested: number }[]
+  const rows = unwrap<
+    { id: number; ingredient_id: number; quantity: number | null; unit_id: number | null; is_suggested: boolean; ingredients: { name: string } | null }[]
   >(
-    `SELECT sli.id, sli.ingredient_id, i.name as ingredient_name, sli.quantity, sli.unit_id, sli.is_suggested
-     FROM shopping_list_items sli JOIN ingredients i ON i.id = sli.ingredient_id
-     WHERE sli.shopping_list_id = $1`,
-    [shoppingListId],
+    (await supabase
+      .from("shopping_list_items")
+      .select("id, ingredient_id, quantity, unit_id, is_suggested, ingredients(name)")
+      .eq("shopping_list_id", shoppingListId)) as never,
   );
+  const flatRows = rows.map((r) => ({ ...r, ingredient_name: r.ingredients?.name ?? "" }));
 
-  const groups = new Map<string, typeof rows>();
-  for (const row of rows) {
+  const groups = new Map<string, typeof flatRows>();
+  for (const row of flatRows) {
     const key = `${ingredientFamily(row.ingredient_name)}:${unitTypeOf(row.unit_id)}`;
     const group = groups.get(key);
     if (group) group.push(row);
@@ -922,7 +976,7 @@ export async function mergeDuplicateShoppingListItems(shoppingListId: number): P
 
   // Chaque groupe (et, à l'intérieur d'un groupe, l'UPDATE de la ligne conservée et les DELETE des autres)
   // touche des lignes distinctes : tout peut s'exécuter en parallèle plutôt que groupe par groupe.
-  const writes: Promise<unknown>[] = [];
+  const writes: PromiseLike<unknown>[] = [];
   for (const group of groups.values()) {
     if (group.length < 2) continue;
 
@@ -939,23 +993,24 @@ export async function mergeDuplicateShoppingListItems(shoppingListId: number): P
       }
     }
     const mergedQuantity = hasQuantity ? (displayUnit ? totalBase / displayUnit.factor_to_base : totalBase) : null;
-    const isSuggested = group.some((r) => r.is_suggested) ? 1 : 0;
+    const isSuggested = group.some((r) => r.is_suggested);
 
     writes.push(
-      db.execute(
-        "UPDATE shopping_list_items SET ingredient_id = $1, quantity = $2, unit_id = $3, is_suggested = $4, price = NULL, price_is_estimate = 0 WHERE id = $5",
-        [
-          displayRow.ingredient_id,
-          mergedQuantity != null ? Math.round(mergedQuantity * 100) / 100 : null,
-          displayRow.unit_id,
-          isSuggested,
-          displayRow.id,
-        ],
-      ),
+      supabase
+        .from("shopping_list_items")
+        .update({
+          ingredient_id: displayRow.ingredient_id,
+          quantity: mergedQuantity != null ? Math.round(mergedQuantity * 100) / 100 : null,
+          unit_id: displayRow.unit_id,
+          is_suggested: isSuggested,
+          price: null,
+          price_is_estimate: false,
+        })
+        .eq("id", displayRow.id),
     );
     for (const row of group) {
       if (row.id !== displayRow.id) {
-        writes.push(db.execute("DELETE FROM shopping_list_items WHERE id = $1", [row.id]));
+        writes.push(supabase.from("shopping_list_items").delete().eq("id", row.id));
       }
     }
   }
@@ -963,41 +1018,42 @@ export async function mergeDuplicateShoppingListItems(shoppingListId: number): P
 }
 
 export async function getShoppingListById(id: number): Promise<ShoppingListFull | null> {
-  const db = await getDb();
-  const lists = await db.select<ShoppingList[]>("SELECT * FROM shopping_lists WHERE id = $1", [id]);
-  const list = lists[0];
+  const { data: list, error } = await supabase.from("shopping_lists").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
   if (!list) return null;
 
-  const rawItems = await db.select<
+  const rows = unwrap<
     {
       id: number;
       ingredient_id: number;
-      ingredient_name: string;
       quantity: number | null;
       unit_id: number | null;
-      unit_abbreviation: string | null;
       price: number | null;
-      price_is_estimate: number;
-      checked: number;
-      is_suggested: number;
+      price_is_estimate: boolean;
+      checked: boolean;
+      is_suggested: boolean;
+      ingredients: { name: string } | null;
+      units: { abbreviation: string } | null;
     }[]
   >(
-    `SELECT sli.id, sli.ingredient_id, i.name as ingredient_name, sli.quantity,
-            sli.unit_id, u.abbreviation as unit_abbreviation, sli.price, sli.price_is_estimate, sli.checked,
-            sli.is_suggested
-     FROM shopping_list_items sli
-     JOIN ingredients i ON i.id = sli.ingredient_id
-     LEFT JOIN units u ON u.id = sli.unit_id
-     WHERE sli.shopping_list_id = $1
-     ORDER BY i.name`,
-    [id],
+    (await supabase
+      .from("shopping_list_items")
+      .select("id, ingredient_id, quantity, unit_id, price, price_is_estimate, checked, is_suggested, ingredients(name), units(abbreviation)")
+      .eq("shopping_list_id", id)
+      .order("name", { foreignTable: "ingredients" })) as never,
   );
 
-  const items: ShoppingListItem[] = rawItems.map((r) => ({
-    ...r,
-    price_is_estimate: !!r.price_is_estimate,
-    checked: !!r.checked,
-    is_suggested: !!r.is_suggested,
+  const items: ShoppingListItem[] = rows.map((r) => ({
+    id: r.id,
+    ingredient_id: r.ingredient_id,
+    ingredient_name: r.ingredients?.name ?? "",
+    quantity: r.quantity,
+    unit_id: r.unit_id,
+    unit_abbreviation: r.units?.abbreviation ?? null,
+    price: r.price,
+    price_is_estimate: r.price_is_estimate,
+    checked: r.checked,
+    is_suggested: r.is_suggested,
   }));
 
   return { ...list, items };
@@ -1007,16 +1063,13 @@ export async function updateShoppingListItem(
   id: number,
   patch: { price?: number | null; priceIsEstimate?: boolean; checked?: boolean },
 ): Promise<void> {
-  const db = await getDb();
   if (patch.price !== undefined) {
-    await db.execute("UPDATE shopping_list_items SET price = $1, price_is_estimate = $2 WHERE id = $3", [
-      patch.price,
-      patch.priceIsEstimate ? 1 : 0,
-      id,
-    ]);
+    unwrap(
+      await supabase.from("shopping_list_items").update({ price: patch.price, price_is_estimate: !!patch.priceIsEstimate }).eq("id", id),
+    );
   }
   if (patch.checked !== undefined) {
-    await db.execute("UPDATE shopping_list_items SET checked = $1 WHERE id = $2", [patch.checked ? 1 : 0, id]);
+    unwrap(await supabase.from("shopping_list_items").update({ checked: patch.checked }).eq("id", id));
   }
 }
 
@@ -1025,20 +1078,21 @@ export async function addShoppingListItem(
   shoppingListId: number,
   input: { ingredient_name: string; ingredient_category?: string; quantity: number | null; unit_abbreviation: string | null },
 ): Promise<number> {
-  const db = await getDb();
   const ingredientId = await findOrCreateIngredient(input.ingredient_name, input.ingredient_category ?? "autre");
   const unitId = input.unit_abbreviation ? await findUnitByAbbreviation(input.unit_abbreviation) : null;
-  const result = await db.execute(
-    "INSERT INTO shopping_list_items (shopping_list_id, ingredient_id, quantity, unit_id) VALUES ($1, $2, $3, $4)",
-    [shoppingListId, ingredientId, input.quantity, unitId],
+  const inserted = unwrap<{ id: number }>(
+    await supabase
+      .from("shopping_list_items")
+      .insert({ shopping_list_id: shoppingListId, ingredient_id: ingredientId, quantity: input.quantity, unit_id: unitId })
+      .select("id")
+      .single(),
   );
   await mergeDuplicateShoppingListItems(shoppingListId);
-  return result.lastInsertId as number;
+  return inserted.id;
 }
 
 export async function deleteShoppingListItem(id: number): Promise<void> {
-  const db = await getDb();
-  await db.execute("DELETE FROM shopping_list_items WHERE id = $1", [id]);
+  unwrap(await supabase.from("shopping_list_items").delete().eq("id", id));
 }
 
 export interface TopRecipeStat {
@@ -1048,29 +1102,30 @@ export interface TopRecipeStat {
 }
 
 export async function getTopMadeRecipes(limit = 5, profileId?: number | null): Promise<TopRecipeStat[]> {
-  const db = await getDb();
+  let logIds: number[] | null = null;
   if (profileId != null) {
-    return db.select<TopRecipeStat[]>(
-      `SELECT r.id as recipe_id, r.title, COUNT(*) as count
-       FROM consumption_log cl
-       JOIN recipes r ON r.id = cl.recipe_id
-       JOIN consumption_log_profiles clp ON clp.consumption_log_id = cl.id
-       WHERE clp.profile_id = $1
-       GROUP BY r.id
-       ORDER BY count DESC
-       LIMIT $2`,
-      [profileId, limit],
+    const rows = unwrap<{ consumption_log_id: number }[]>(
+      await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
+    logIds = rows.map((r) => r.consumption_log_id);
+    if (logIds.length === 0) return [];
   }
-  return db.select<TopRecipeStat[]>(
-    `SELECT r.id as recipe_id, r.title, COUNT(*) as count
-     FROM consumption_log cl
-     JOIN recipes r ON r.id = cl.recipe_id
-     GROUP BY r.id
-     ORDER BY count DESC
-     LIMIT $1`,
-    [limit],
-  );
+
+  let query = supabase.from("consumption_log").select("recipe_id, recipes(title)");
+  if (logIds) query = query.in("id", logIds);
+  const rows = unwrap<{ recipe_id: number; recipes: { title: string } | null }[]>(await (query as never));
+
+  const counts = new Map<number, { title: string; count: number }>();
+  for (const row of rows) {
+    const entry = counts.get(row.recipe_id) ?? { title: row.recipes?.title ?? "", count: 0 };
+    entry.count += 1;
+    counts.set(row.recipe_id, entry);
+  }
+
+  return [...counts.entries()]
+    .map(([recipe_id, { title, count }]) => ({ recipe_id, title, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
 
 export interface CategoryStat {
@@ -1083,45 +1138,44 @@ export interface CategoryStat {
  * des catégories d'ingrédients consommés, via le garde-manger et les recettes faites.
  */
 export async function getConsumptionByCategory(profileId?: number | null): Promise<CategoryStat[]> {
-  const db = await getDb();
+  const counts = new Map<string, number>();
+  const add = (category: string) => counts.set(category, (counts.get(category) ?? 0) + 1);
+
+  let pantryQuery = supabase.from("pantry_consumption_log").select("ingredients(category)");
+  if (profileId != null) pantryQuery = pantryQuery.eq("profile_id", profileId);
+  const pantryRows = unwrap<{ ingredients: { category: string } | null }[]>(await (pantryQuery as never));
+  for (const row of pantryRows) if (row.ingredients) add(row.ingredients.category);
+
+  let logIds: number[] | null = null;
   if (profileId != null) {
-    return db.select<CategoryStat[]>(
-      `SELECT category, COUNT(*) as count FROM (
-         SELECT i.category as category
-         FROM pantry_consumption_log pcl
-         JOIN ingredients i ON i.id = pcl.ingredient_id
-         WHERE pcl.profile_id = $1
-
-         UNION ALL
-
-         SELECT i.category as category
-         FROM consumption_log cl
-         JOIN consumption_log_profiles clp ON clp.consumption_log_id = cl.id
-         JOIN recipe_ingredients ri ON ri.recipe_id = cl.recipe_id
-         JOIN ingredients i ON i.id = ri.ingredient_id
-         WHERE clp.profile_id = $1
-       )
-       GROUP BY category
-       ORDER BY count DESC`,
-      [profileId],
+    const rows = unwrap<{ consumption_log_id: number }[]>(
+      await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
+    logIds = rows.map((r) => r.consumption_log_id);
   }
-  return db.select<CategoryStat[]>(
-    `SELECT category, COUNT(*) as count FROM (
-       SELECT i.category as category
-       FROM pantry_consumption_log pcl
-       JOIN ingredients i ON i.id = pcl.ingredient_id
 
-       UNION ALL
+  let logQuery = supabase.from("consumption_log").select("id, recipe_id");
+  if (logIds) logQuery = logQuery.in("id", logIds);
+  const logRows = unwrap<{ id: number; recipe_id: number }[]>(await logQuery);
 
-       SELECT i.category as category
-       FROM consumption_log cl
-       JOIN recipe_ingredients ri ON ri.recipe_id = cl.recipe_id
-       JOIN ingredients i ON i.id = ri.ingredient_id
-     )
-     GROUP BY category
-     ORDER BY count DESC`,
-  );
+  if (logRows.length > 0) {
+    const uniqueRecipeIds = [...new Set(logRows.map((r) => r.recipe_id))];
+    const ingredientRows = unwrap<{ recipe_id: number; ingredients: { category: string } | null }[]>(
+      (await supabase.from("recipe_ingredients").select("recipe_id, ingredients(category)").in("recipe_id", uniqueRecipeIds)) as never,
+    );
+    const categoriesByRecipe = new Map<number, string[]>();
+    for (const row of ingredientRows) {
+      if (!row.ingredients) continue;
+      const list = categoriesByRecipe.get(row.recipe_id) ?? [];
+      list.push(row.ingredients.category);
+      categoriesByRecipe.set(row.recipe_id, list);
+    }
+    for (const log of logRows) {
+      for (const category of categoriesByRecipe.get(log.recipe_id) ?? []) add(category);
+    }
+  }
+
+  return [...counts.entries()].map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
 }
 
 export interface ProfileStat {
@@ -1132,18 +1186,28 @@ export interface ProfileStat {
 }
 
 export async function getConsumptionByProfile(): Promise<ProfileStat[]> {
-  const db = await getDb();
-  return db.select<ProfileStat[]>(
-    `SELECT pr.id as profile_id, pr.name as profile_name, pr.color as profile_color, COUNT(*) as count
-     FROM (
-       SELECT profile_id FROM pantry_consumption_log WHERE profile_id IS NOT NULL
-       UNION ALL
-       SELECT profile_id FROM consumption_log_profiles
-     ) combined
-     JOIN consumer_profiles pr ON pr.id = combined.profile_id
-     GROUP BY pr.id
-     ORDER BY count DESC`,
-  );
+  const [pantryRows, logProfileRows, profiles] = await Promise.all([
+    supabase
+      .from("pantry_consumption_log")
+      .select("profile_id")
+      .not("profile_id", "is", null)
+      .then((r) => unwrap<{ profile_id: number }[]>(r)),
+    supabase.from("consumption_log_profiles").select("profile_id").then((r) => unwrap<{ profile_id: number }[]>(r)),
+    listProfiles(),
+  ]);
+
+  const counts = new Map<number, number>();
+  for (const row of pantryRows) counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
+  for (const row of logProfileRows) counts.set(row.profile_id, (counts.get(row.profile_id) ?? 0) + 1);
+
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  return [...counts.entries()]
+    .filter(([id]) => profileById.has(id))
+    .map(([id, count]) => {
+      const p = profileById.get(id)!;
+      return { profile_id: id, profile_name: p.name, profile_color: p.color, count };
+    })
+    .sort((a, b) => b.count - a.count);
 }
 
 export interface WasteAvoidedItem {
@@ -1155,14 +1219,19 @@ export interface WasteAvoidedItem {
 
 /** Aliments consommés à temps (proches de la péremption ou déjà périmés), donc sauvés du gaspillage. */
 export async function getWasteAvoidedItems(): Promise<WasteAvoidedItem[]> {
-  const db = await getDb();
-  return db.select<WasteAvoidedItem[]>(
-    `SELECT i.name as ingredient_name, w.quantity, u.abbreviation as unit_abbreviation, w.consumed_at
-     FROM pantry_waste_avoided_log w
-     JOIN ingredients i ON i.id = w.ingredient_id
-     LEFT JOIN units u ON u.id = w.unit_id
-     ORDER BY w.consumed_at DESC`,
+  const rows = unwrap<{ quantity: number; consumed_at: string; ingredients: { name: string } | null; units: { abbreviation: string } | null }[]>(
+    (await supabase
+      .from("pantry_waste_avoided_log")
+      .select("quantity, consumed_at, ingredients(name), units(abbreviation)")
+      .order("consumed_at", { ascending: false })) as never,
   );
+
+  return rows.map((r) => ({
+    ingredient_name: r.ingredients?.name ?? "",
+    quantity: r.quantity,
+    unit_abbreviation: r.units?.abbreviation ?? null,
+    consumed_at: r.consumed_at,
+  }));
 }
 
 export interface ShoppingBudgetPoint {
@@ -1174,13 +1243,21 @@ export interface ShoppingBudgetPoint {
 
 /** Évolution du budget courses estimé au fil des listes de courses générées/remplies. */
 export async function getShoppingBudgetTrend(): Promise<ShoppingBudgetPoint[]> {
-  const db = await getDb();
-  return db.select<ShoppingBudgetPoint[]>(
-    `SELECT sl.id as shopping_list_id, sl.name, sl.created_at, COALESCE(SUM(sli.price), 0) as total_price
-     FROM shopping_lists sl
-     LEFT JOIN shopping_list_items sli ON sli.shopping_list_id = sl.id
-     GROUP BY sl.id
-     HAVING total_price > 0
-     ORDER BY sl.created_at ASC`,
+  const lists = unwrap<{ id: number; name: string; created_at: string }[]>(
+    await supabase.from("shopping_lists").select("id, name, created_at").order("created_at", { ascending: true }),
   );
+  if (lists.length === 0) return [];
+
+  const items = unwrap<{ shopping_list_id: number; price: number | null }[]>(
+    await supabase.from("shopping_list_items").select("shopping_list_id, price"),
+  );
+  const totalByList = new Map<number, number>();
+  for (const item of items) {
+    if (item.price == null) continue;
+    totalByList.set(item.shopping_list_id, (totalByList.get(item.shopping_list_id) ?? 0) + item.price);
+  }
+
+  return lists
+    .map((l) => ({ shopping_list_id: l.id, name: l.name, created_at: l.created_at, total_price: totalByList.get(l.id) ?? 0 }))
+    .filter((p) => p.total_price > 0);
 }

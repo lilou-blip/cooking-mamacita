@@ -10,6 +10,7 @@ type Section = "carnet" | "pantry" | "menus" | "stats" | "shopping";
 
 interface HomeTableProps {
   onSelect: (section: Section) => void;
+  onLogout: () => void;
 }
 
 const OBJECTS: { section: Section; title: string; image: string; className: string }[] = [
@@ -20,9 +21,14 @@ const OBJECTS: { section: Section; title: string; image: string; className: stri
   { section: "shopping", title: "Liste de courses", image: shoppingListImg, className: "home-object--shopping" },
 ];
 
-export function HomeTable({ onSelect }: HomeTableProps) {
+export function HomeTable({ onSelect, onLogout }: HomeTableProps) {
   return (
     <div className="home-table" style={{ backgroundImage: `url(${tableBackground})` }}>
+      <div className="home-table__topbar">
+        <button className="home-table__logout" onClick={onLogout}>
+          Se déconnecter
+        </button>
+      </div>
       <h1 className="home-table__title">Cooking Mamacita</h1>
       {OBJECTS.map(({ section, title, image, className }) => (
         <button key={section} className={`home-object ${className}`} onClick={() => onSelect(section)} aria-label={title}>

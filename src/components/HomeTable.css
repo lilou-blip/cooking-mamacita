@@ -7,6 +7,32 @@
   overflow: hidden;
 }
 
+.home-table__topbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+}
+
+.home-table__logout {
+  background: var(--color-white);
+  border: none;
+  border-radius: var(--radius-card);
+  padding: 8px 14px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  box-shadow: var(--shadow-page);
+  white-space: nowrap;
+}
+.home-table__logout:hover {
+  color: var(--color-groseille);
+}
+
 .home-table__title {
   position: absolute;
   top: 44%;
