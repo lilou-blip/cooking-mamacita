@@ -899,6 +899,74 @@ export async function deleteShoppingList(id: number): Promise<void> {
   unwrap(await supabase.from("shopping_lists").delete().eq("id", id));
 }
 
+export interface BatchIngredientPreviewRow {
+  ingredient_name: string;
+  quantity: number;
+  unit_abbreviation: string | null;
+  have_enough: boolean;
+}
+
+/** Ingrédients combinés nécessaires pour une séance de batch cooking (plusieurs recettes, chacune à un
+ * nombre de portions donné), comparés à ce qu'il y a déjà au garde-manger — sans créer de liste de courses,
+ * juste un aperçu pour la séance en cours. */
+export async function previewBatchIngredients(
+  items: { recipeId: number; servings: number }[],
+): Promise<BatchIngredientPreviewRow[]> {
+  const recipes = await Promise.all(items.map((i) => getRecipeById(i.recipeId)));
+  const units = await listUnits();
+  const { unitById, unitTypeOf, toBase } = createUnitConverter(units);
+
+  const needed = new Map<
+    string,
+    { ingredientName: string; baseQuantity: number; displayUnitId: number | null; displayQuantity: number }
+  >();
+  items.forEach((item, i) => {
+    const recipe = recipes[i];
+    if (!recipe || item.servings <= 0) return;
+    const scale = recipe.servings > 0 ? item.servings / recipe.servings : 1;
+    for (const ing of recipe.ingredients) {
+      if (ing.quantity == null) continue;
+      const scaledQty = ing.quantity * scale;
+      const baseQty = toBase(scaledQty, ing.unit_id);
+      const key = `${ing.ingredient_id}:${unitTypeOf(ing.unit_id)}`;
+      const existing = needed.get(key);
+      if (existing) {
+        existing.baseQuantity += baseQty;
+        if (existing.displayUnitId === ing.unit_id) existing.displayQuantity += scaledQty;
+      } else {
+        needed.set(key, {
+          ingredientName: ing.ingredient_name,
+          baseQuantity: baseQty,
+          displayUnitId: ing.unit_id,
+          displayQuantity: scaledQty,
+        });
+      }
+    }
+  });
+
+  const pantryRows = unwrap<{ ingredient_id: number; unit_id: number | null; quantity: number }[]>(
+    await supabase.from("pantry_items").select("ingredient_id, unit_id, quantity"),
+  );
+  const pantryBaseByKey = new Map<string, number>();
+  for (const row of pantryRows) {
+    const baseQty = toBase(row.quantity, row.unit_id);
+    const key = `${row.ingredient_id}:${unitTypeOf(row.unit_id)}`;
+    pantryBaseByKey.set(key, (pantryBaseByKey.get(key) ?? 0) + baseQty);
+  }
+
+  const result: BatchIngredientPreviewRow[] = [];
+  for (const [key, entry] of needed.entries()) {
+    const unit = entry.displayUnitId != null ? unitById.get(entry.displayUnitId) : undefined;
+    result.push({
+      ingredient_name: entry.ingredientName,
+      quantity: Math.round(entry.displayQuantity * 100) / 100,
+      unit_abbreviation: unit?.abbreviation ?? null,
+      have_enough: (pantryBaseByKey.get(key) ?? 0) >= entry.baseQuantity,
+    });
+  }
+  return result.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
+}
+
 /** Produits de base qu'on veut se voir suggérer dès qu'il en reste peu, même s'ils ne sont pas requis par le menu. */
 const STAPLE_DEFAULTS: { name: string; category: string; quantity: number; unitAbbr: string | null }[] = [
   { name: "oeufs", category: "proteines", quantity: 6, unitAbbr: null },

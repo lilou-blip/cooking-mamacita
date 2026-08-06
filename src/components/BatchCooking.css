@@ -172,6 +172,102 @@
   flex: 1;
 }
 
+.batch-cooking__entry-toggle {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--color-groseille);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 0 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.batch-cooking__entry-toggle:hover {
+  text-decoration: underline;
+}
+
+.batch-cooking__entry-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.batch-cooking__entry-detail-col {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.batch-cooking__entry-detail-col h4 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  color: var(--color-groseille-deep);
+}
+.batch-cooking__entry-detail-col ul,
+.batch-cooking__entry-detail-col ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: var(--color-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-cooking__optimize {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  margin-bottom: 18px;
+}
+.batch-cooking__optimize-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.batch-cooking__ingredient-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.batch-cooking__ingredient {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.86rem;
+  padding: 6px 8px;
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+}
+.batch-cooking__ingredient--missing .batch-cooking__ingredient-name {
+  color: var(--color-groseille);
+  font-weight: 700;
+}
+.batch-cooking__ingredient-name {
+  flex: 1;
+}
+.batch-cooking__ingredient-qty {
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.batch-cooking__plan {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--color-ink);
+}
+
 .batch-cooking__actions {
   display: flex;
   justify-content: flex-end;

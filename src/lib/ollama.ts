@@ -371,3 +371,31 @@ Si la photo est illisible ou n'est manifestement pas un ticket de caisse, répon
       price: typeof i.price === "number" && i.price >= 0 ? i.price : null,
     }));
 }
+
+/** Propose un ordre efficace pour cuisiner plusieurs recettes à la suite lors d'une séance de batch cooking
+ * (fours/plaques mutualisés, préparations communes regroupées, temps d'attente d'une recette utilisés pour
+ * avancer une autre...). */
+export async function suggestBatchCookingPlan(
+  recipes: { title: string; ingredients: string[]; steps: string[] }[],
+): Promise<string[]> {
+  if (recipes.length === 0) return [];
+
+  const systemPrompt = `Tu aides à organiser une séance de batch cooking : cuisiner plusieurs recettes à la suite le plus efficacement possible (fours/plaques utilisés en parallèle, préparations communes regroupées comme couper tous les oignons en une fois, temps d'attente/cuisson d'une recette utilisés pour avancer une autre...).
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"plan": [string, ...]}
+Chaque élément de "plan" est une étape concrète et courte (une phrase), dans l'ordre à suivre pour cuisiner TOUTES les recettes ci-dessous ensemble. Entre 5 et 12 étapes, adapte le nombre à la complexité réelle. Base-toi uniquement sur les recettes fournies, n'invente pas d'ingrédient ou d'étape qui n'y figure pas.`;
+
+  const recipesText = recipes
+    .map(
+      (r, i) =>
+        `### Recette ${i + 1} : ${r.title}\nIngrédients : ${r.ingredients.join(", ")}\nÉtapes :\n${r.steps
+          .map((s, j) => `${j + 1}. ${s}`)
+          .join("\n")}`,
+    )
+    .join("\n\n");
+
+  const parsed = await callAiJson(systemPrompt, recipesText, 900);
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const plan = Array.isArray(obj.plan) ? obj.plan : [];
+
+  return plan.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim());
+}
