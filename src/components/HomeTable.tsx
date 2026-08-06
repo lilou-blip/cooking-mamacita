@@ -11,6 +11,8 @@ type Section = "carnet" | "pantry" | "menus" | "stats" | "shopping";
 interface HomeTableProps {
   onSelect: (section: Section) => void;
   onLogout: () => void;
+  notifPermission: NotificationPermission | "unsupported";
+  onEnableNotifications: () => void;
 }
 
 const OBJECTS: { section: Section; title: string; image: string; className: string }[] = [
@@ -21,10 +23,15 @@ const OBJECTS: { section: Section; title: string; image: string; className: stri
   { section: "shopping", title: "Liste de courses", image: shoppingListImg, className: "home-object--shopping" },
 ];
 
-export function HomeTable({ onSelect, onLogout }: HomeTableProps) {
+export function HomeTable({ onSelect, onLogout, notifPermission, onEnableNotifications }: HomeTableProps) {
   return (
     <div className="home-table" style={{ backgroundImage: `url(${tableBackground})` }}>
       <div className="home-table__topbar">
+        {notifPermission === "default" && (
+          <button className="home-table__logout" onClick={onEnableNotifications}>
+            🔔 Activer les notifications
+          </button>
+        )}
         <button className="home-table__logout" onClick={onLogout}>
           Se déconnecter
         </button>

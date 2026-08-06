@@ -19,6 +19,12 @@
 .pantry-form__row select {
   width: 100%;
 }
+.pantry-form__scan {
+  grid-column: 1 / -1;
+  justify-self: start;
+  white-space: nowrap;
+}
+
 .pantry-form__expiry {
   display: flex;
   flex-direction: column;

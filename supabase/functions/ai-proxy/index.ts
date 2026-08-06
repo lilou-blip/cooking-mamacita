@@ -39,10 +39,18 @@ Deno.serve(async (req) => {
       throw new Error("ANTHROPIC_API_KEY n'est pas configurée sur ce projet Supabase (Edge Functions > Secrets).");
     }
 
-    const { systemPrompt, userMessage, numPredict } = await req.json();
+    const { systemPrompt, userMessage, numPredict, image, mediaType } = await req.json();
     if (typeof systemPrompt !== "string" || typeof userMessage !== "string") {
       throw new Error("systemPrompt et userMessage sont requis.");
     }
+
+    // Pour le scan de ticket de caisse : une image en base64 (sans le préfixe "data:...;base64,") peut être
+    // jointe au message, Claude sait lire une photo directement (pas besoin d'OCR séparé).
+    const userContent: Record<string, unknown>[] = [];
+    if (typeof image === "string" && typeof mediaType === "string") {
+      userContent.push({ type: "image", source: { type: "base64", media_type: mediaType, data: image } });
+    }
+    userContent.push({ type: "text", text: userMessage });
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -58,7 +66,7 @@ Deno.serve(async (req) => {
         // Anthropic n'a pas d'équivalent au mode JSON strict d'Ollama : on force la réponse à commencer
         // par "{" (préremplissage de l'échange) pour fiabiliser une sortie JSON pure, sans texte autour.
         messages: [
-          { role: "user", content: userMessage },
+          { role: "user", content: userContent },
           { role: "assistant", content: "{" },
         ],
       }),

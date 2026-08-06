@@ -24,8 +24,9 @@ import { Stats } from "./components/Stats";
 import { HomeTable } from "./components/HomeTable";
 import { ImportRecipe } from "./components/ImportRecipe";
 import { AiAssistant } from "./components/AiAssistant";
-import { StandaloneShoppingList } from "./components/StandaloneShoppingList";
+import { ShoppingLists } from "./components/ShoppingLists";
 import type { RecipeDraft } from "./lib/ollama";
+import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
 
 type View = "toc" | "book" | "form" | "import";
 type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping";
@@ -58,6 +59,7 @@ function App({ onLogout }: AppProps) {
   const [showMadeForm, setShowMadeForm] = useState(false);
   const [selectedMadeProfiles, setSelectedMadeProfiles] = useState<Set<number>>(new Set());
   const [turning, setTurning] = useState<TurnDirection | null>(null);
+  const [notifPermission, setNotifPermission] = useState(notificationPermission());
   const touchStartX = useRef<number | null>(null);
 
   const refreshRecipes = useCallback(async () => {
@@ -66,12 +68,19 @@ function App({ onLogout }: AppProps) {
     return list;
   }, []);
 
+  async function handleEnableNotifications() {
+    const permission = await requestNotificationPermission();
+    setNotifPermission(permission);
+    if (permission === "granted") checkAndNotify();
+  }
+
   useEffect(() => {
     (async () => {
       try {
         await ensureSeedRecipe();
         await refreshRecipes();
         setProfiles(await listProfiles());
+        if (notificationPermission() === "granted") checkAndNotify();
       } catch (err) {
         setError(String(err));
       } finally {
@@ -346,7 +355,12 @@ function App({ onLogout }: AppProps) {
   return (
     <>
       {section === "table" ? (
-        <HomeTable onSelect={setSection} onLogout={onLogout} />
+        <HomeTable
+          onSelect={setSection}
+          onLogout={onLogout}
+          notifPermission={notifPermission}
+          onEnableNotifications={handleEnableNotifications}
+        />
       ) : section === "pantry" ? (
         <PantryRoom onBack={() => setSection("table")} onSuggestRecipe={handleVideFrigoDraft} />
       ) : section === "menus" ? (
@@ -354,7 +368,7 @@ function App({ onLogout }: AppProps) {
       ) : section === "stats" ? (
         <Stats onBack={() => setSection("table")} />
       ) : section === "shopping" ? (
-        <StandaloneShoppingList onBack={() => setSection("table")} />
+        <ShoppingLists onBack={() => setSection("table")} />
       ) : (
         renderCarnet()
       )}

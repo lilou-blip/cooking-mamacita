@@ -822,6 +822,53 @@ export async function getOrCreateStandaloneShoppingList(): Promise<number> {
   return inserted.id;
 }
 
+export interface ShoppingListSummary extends ShoppingList {
+  item_count: number;
+  checked_count: number;
+}
+
+/** Liste toutes les listes de courses libres (pas celles générées automatiquement pour un menu). */
+export async function listShoppingLists(): Promise<ShoppingListSummary[]> {
+  const lists = unwrap<ShoppingList[]>(
+    await supabase.from("shopping_lists").select("*").is("menu_id", null).order("created_at", { ascending: false }),
+  );
+  if (lists.length === 0) return [];
+
+  const items = unwrap<{ shopping_list_id: number; checked: boolean }[]>(
+    await supabase
+      .from("shopping_list_items")
+      .select("shopping_list_id, checked")
+      .in(
+        "shopping_list_id",
+        lists.map((l) => l.id),
+      ),
+  );
+  const countsByList = new Map<number, { item_count: number; checked_count: number }>();
+  for (const item of items) {
+    const counts = countsByList.get(item.shopping_list_id) ?? { item_count: 0, checked_count: 0 };
+    counts.item_count += 1;
+    if (item.checked) counts.checked_count += 1;
+    countsByList.set(item.shopping_list_id, counts);
+  }
+
+  return lists.map((l) => ({ ...l, ...(countsByList.get(l.id) ?? { item_count: 0, checked_count: 0 }) }));
+}
+
+export async function createShoppingList(name: string): Promise<number> {
+  const inserted = unwrap<{ id: number }>(
+    await supabase.from("shopping_lists").insert({ menu_id: null, name }).select("id").single(),
+  );
+  return inserted.id;
+}
+
+export async function renameShoppingList(id: number, name: string): Promise<void> {
+  unwrap(await supabase.from("shopping_lists").update({ name }).eq("id", id));
+}
+
+export async function deleteShoppingList(id: number): Promise<void> {
+  unwrap(await supabase.from("shopping_lists").delete().eq("id", id));
+}
+
 /** Produits de base qu'on veut se voir suggérer dès qu'il en reste peu, même s'ils ne sont pas requis par le menu. */
 const STAPLE_DEFAULTS: { name: string; category: string; quantity: number; unitAbbr: string | null }[] = [
   { name: "oeufs", category: "proteines", quantity: 6, unitAbbr: null },

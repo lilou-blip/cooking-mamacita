@@ -58,6 +58,20 @@ function stripHtml(html: string): string {
   return out;
 }
 
+/** Lit le contenu d'une balise <meta property="X" content="..."> (ou name="X"), attributs dans n'importe quel ordre. */
+function extractMetaContent(html: string, property: string): string | null {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`<meta[^>]*(?:property|name)=["']${escaped}["'][^>]*content=["']([^"']*)["']`, "i"),
+    new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*(?:property|name)=["']${escaped}["']`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&amp;/g, "&")
@@ -134,10 +148,24 @@ Deno.serve(async (req) => {
     }
 
     const html = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-    const normalized = normalizeWhitespace(decodeEntities(stripHtml(html)));
-    const truncated = normalized.slice(0, MAX_TEXT_CHARS);
 
-    if (truncated.trim() === "") throw new Error("Aucun texte exploitable n'a été trouvé sur cette page.");
+    // Posts de réseaux sociaux (Instagram, TikTok, Facebook...) : ce sont des pages très majoritairement en JS,
+    // le HTML brut ne contient quasiment que les balises <meta> Open Graph, avec la légende (souvent la recette)
+    // dans og:description. On les priorise avant le nettoyage générique, qui ne donnerait que du bruit d'appli JS.
+    const ogTitle = extractMetaContent(html, "og:title");
+    const ogDescription = extractMetaContent(html, "og:description");
+    const ogText = normalizeWhitespace(decodeEntities([ogTitle, ogDescription].filter(Boolean).join("\n\n")));
+
+    const truncated =
+      ogText.length > 0
+        ? ogText.slice(0, MAX_TEXT_CHARS)
+        : normalizeWhitespace(decodeEntities(stripHtml(html))).slice(0, MAX_TEXT_CHARS);
+
+    if (truncated.trim() === "") {
+      throw new Error(
+        "Aucun texte exploitable n'a été trouvé sur cette page (post privé, ou site qui bloque la récupération automatique). Colle le texte à la main.",
+      );
+    }
 
     return new Response(JSON.stringify({ text: truncated }), {
       headers: { ...corsHeaders, "content-type": "application/json" },

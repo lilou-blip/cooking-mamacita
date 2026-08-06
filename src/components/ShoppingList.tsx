@@ -12,7 +12,7 @@ import {
   type StorageUnit,
   type Unit,
 } from "../lib/db";
-import { estimatePriceRange } from "../lib/ollama";
+import { estimatePriceRange, estimatePricesByRetailer, type RetailerPrice } from "../lib/ollama";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import "./BookPage.css";
@@ -34,6 +34,10 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   const [estimatingId, setEstimatingId] = useState<number | null>(null);
   const [estimatingAll, setEstimatingAll] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [comparingId, setComparingId] = useState<number | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState<number | null>(null);
+  const [comparisons, setComparisons] = useState<Record<number, RetailerPrice[]>>({});
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newQuantity, setNewQuantity] = useState("");
@@ -114,6 +118,25 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
       setEstimateError(String(err));
     } finally {
       setEstimatingId(null);
+    }
+  }
+
+  async function handleCompare(item: ShoppingListItem) {
+    if (comparingId === item.id) {
+      setComparingId(null);
+      return;
+    }
+    setComparingId(item.id);
+    if (comparisons[item.id]) return;
+    setComparisonLoading(item.id);
+    setComparisonError(null);
+    try {
+      const rows = await estimatePricesByRetailer(item.ingredient_name, item.quantity, item.unit_abbreviation);
+      setComparisons((prev) => ({ ...prev, [item.id]: rows }));
+    } catch (err) {
+      setComparisonError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setComparisonLoading(null);
     }
   }
 
@@ -208,7 +231,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--transferring" : ""}`}
+                className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id || comparingId === item.id ? " shopping-list__item--expanded" : ""}`}
               >
                 <input
                   type="checkbox"
@@ -233,6 +256,14 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
                   </button>
                 )}
                 {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
+                <button
+                  type="button"
+                  className="shopping-list__estimate"
+                  onClick={() => handleCompare(item)}
+                  disabled={comparisonLoading === item.id}
+                >
+                  {comparisonLoading === item.id ? "..." : "🏷️ Comparer"}
+                </button>
                 <input
                   key={`${item.id}-${item.price ?? "empty"}`}
                   className="shopping-list__price"
@@ -251,6 +282,33 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
                 >
                   ×
                 </button>
+
+                {comparingId === item.id && (
+                  <div className="shopping-list__comparison">
+                    <p className="shopping-list__comparison-note">
+                      Estimation comparative par IA (pas des prix scrapés en temps réel) — pour se situer entre
+                      enseignes, pas un prix garanti.
+                    </p>
+                    {comparisonError && <p className="form-error">{comparisonError}</p>}
+                    {comparisons[item.id] && (
+                      <ul className="shopping-list__comparison-list">
+                        {(() => {
+                          const rows = comparisons[item.id];
+                          const min = Math.min(...rows.map((r) => r.price));
+                          return rows.map((r) => (
+                            <li
+                              key={r.retailer}
+                              className={r.price === min ? "shopping-list__comparison-row--cheapest" : undefined}
+                            >
+                              <span>{r.retailer}</span>
+                              <strong>{r.price.toFixed(2)} €</strong>
+                            </li>
+                          ));
+                        })()}
+                      </ul>
+                    )}
+                  </div>
+                )}
 
                 {transferringId === item.id && (
                   <div className="shopping-list__transfer">

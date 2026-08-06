@@ -1,0 +1,55 @@
+.barcode-scanner {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.barcode-scanner__panel {
+  position: relative;
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.barcode-scanner__video {
+  width: 100%;
+  border-radius: var(--radius-tag);
+  background: #000;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.barcode-scanner__hint {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: 0.88rem;
+}
+
+.barcode-scanner__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--color-cream);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-ink-soft);
+}
+.barcode-scanner__close:hover {
+  color: var(--color-groseille);
+}

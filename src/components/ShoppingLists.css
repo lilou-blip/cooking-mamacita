@@ -1,0 +1,113 @@
+.shopping-lists {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(16px, 4vh, 32px) 20px;
+  overflow: auto;
+}
+.shopping-lists .book-nav__back {
+  display: block;
+  flex-shrink: 0;
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.shopping-lists__paper {
+  flex: 1;
+  max-width: 700px;
+  width: 100%;
+  margin: 10px auto 0;
+  background: var(--color-cream);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 30px 24px;
+}
+
+.shopping-lists__paper h1 {
+  font-family: var(--font-title);
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  color: var(--color-groseille-deep);
+  margin: 10px 0 16px;
+  text-align: center;
+}
+
+.shopping-lists__empty {
+  text-align: center;
+  color: var(--color-ink-soft);
+}
+
+.shopping-lists__items {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-lists__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-white);
+  border-radius: var(--radius-tag);
+  padding: 10px 12px;
+}
+
+.shopping-lists__name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.shopping-lists__name:hover {
+  color: var(--color-groseille-deep);
+}
+
+.shopping-lists__count {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.shopping-lists__rename-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+.shopping-lists__rename,
+.shopping-lists__delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--color-ink-soft);
+  padding: 4px 6px;
+}
+.shopping-lists__rename:hover {
+  color: var(--color-groseille-deep);
+}
+.shopping-lists__delete:hover {
+  color: var(--color-groseille);
+}
+
+.shopping-lists__add {
+  display: flex;
+  gap: 10px;
+}
+.shopping-lists__add input {
+  flex: 1;
+}

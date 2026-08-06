@@ -5,6 +5,7 @@ import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/ollama";
 import pantryBackground from "../assets/illustrations/pantry-background.png";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
+import { ReceiptScanner } from "./ReceiptScanner";
 import "./PantryRoom.css";
 
 interface PantryRoomProps {
@@ -33,6 +34,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const [activeUnitId, setActiveUnitId] = useState<number | "all" | null>(null);
   const [videFrigoLoading, setVideFrigoLoading] = useState(false);
   const [videFrigoError, setVideFrigoError] = useState<string | null>(null);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
 
   const refresh = useCallback(async () => {
     const [unitList, itemList] = await Promise.all([listStorageUnits(), listPantryItems()]);
@@ -134,6 +136,9 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
         <button className="pantry-room__action" onClick={handleVideFrigo} disabled={videFrigoLoading}>
           {videFrigoLoading ? "L'IA réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
         </button>
+        <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>
+          📸 Scanner un ticket
+        </button>
       </div>
       {videFrigoError && <p className="pantry-room__vide-frigo-error">{videFrigoError}</p>}
 
@@ -185,6 +190,16 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
             <StorageUnitForm onCreated={handleCreateUnit} onCancel={() => setShowForm(false)} />
           </div>
         </div>
+      )}
+
+      {showReceiptScanner && (
+        <ReceiptScanner
+          onCancel={() => setShowReceiptScanner(false)}
+          onDone={() => {
+            setShowReceiptScanner(false);
+            refresh();
+          }}
+        />
       )}
     </div>
   );

@@ -48,7 +48,8 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
       <h1>Importer une recette avec l'IA ✨</h1>
       <p className="import-recipe__hint">
         Colle le texte d'une recette (depuis un site, une photo transcrite, etc.), ou récupère-le automatiquement
-        depuis une URL, et l'IA locale va la structurer pour toi — titre, ingrédients, étapes et tags.
+        depuis une URL — y compris un post Instagram/TikTok/Facebook <em>public</em> dont la légende contient la
+        recette — et l'IA la structure pour toi : titre, ingrédients, étapes et tags.
       </p>
 
       <div className="import-recipe__url-row">

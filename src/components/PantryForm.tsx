@@ -1,8 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { createPantryItem, listUnits, type Profile, type StorageUnit, type Unit } from "../lib/db";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
+import { lookupBarcode } from "../lib/openFoodFacts";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import "./PantryForm.css";
+
+// La lib de décodage de code-barres (@zxing) est volumineuse et rarement utilisée : chargée à la demande
+// seulement quand on ouvre le scanner, plutôt que dans le bundle initial de toute l'app.
+const BarcodeScanner = lazy(() => import("./BarcodeScanner").then((m) => ({ default: m.BarcodeScanner })));
 
 interface PantryFormProps {
   profiles: Profile[];
@@ -23,10 +28,31 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
   const [assignments, setAssignments] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
 
   useEffect(() => {
     listUnits().then(setUnits);
   }, []);
+
+  async function handleBarcodeDetected(code: string) {
+    setScanning(false);
+    setLookingUp(true);
+    setError(null);
+    try {
+      const product = await lookupBarcode(code);
+      if (product) {
+        setName(product.name);
+        setCategory(product.category);
+      } else {
+        setError(`Aucun produit trouvé pour le code-barres ${code}. Renseigne-le manuellement.`);
+      }
+    } catch {
+      setError("Impossible de contacter Open Food Facts pour l'instant.");
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   const totalQuantity = Number(quantity) || 0;
   const assignedTotal = Object.values(assignments).reduce((sum, v) => sum + (Number(v) || 0), 0);
@@ -64,6 +90,12 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
     <form className="pantry-form" onSubmit={handleSubmit}>
       {error && <p className="form-error">{error}</p>}
 
+      {scanning && (
+        <Suspense fallback={null}>
+          <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
+        </Suspense>
+      )}
+
       <div className="pantry-form__row">
         <IngredientAutocomplete
           className="pantry-form__name"
@@ -75,6 +107,14 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
             setCategory(ing.category);
           }}
         />
+        <button
+          type="button"
+          className="form-cancel pantry-form__scan"
+          onClick={() => setScanning(true)}
+          disabled={lookingUp}
+        >
+          {lookingUp ? "Recherche..." : "📷 Scanner"}
+        </button>
         <input
           className="pantry-form__quantity"
           placeholder="Qté"

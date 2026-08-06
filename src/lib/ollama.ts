@@ -239,6 +239,48 @@ Réponds UNIQUEMENT avec un objet JSON valide : {"low": nombre, "high": nombre}
   return { low, high };
 }
 
+export const PRICE_COMPARISON_RETAILERS = ["Carrefour", "E.Leclerc", "Auchan", "Intermarché", "Lidl", "Aldi"] as const;
+
+export interface RetailerPrice {
+  retailer: string;
+  price: number;
+}
+
+/**
+ * Comparateur de prix par enseigne. Il ne s'agit PAS de prix scrapés en temps réel sur les sites des enseignes
+ * (trop fragile et à la limite de leurs conditions d'utilisation pour être fiable) mais d'une estimation
+ * comparative par l'IA, qui reflète le positionnement prix connu de chaque enseigne (Lidl/Aldi moins chers que
+ * Carrefour/Auchan sur beaucoup de produits, etc.) — utile pour se situer, pas pour un prix exact garanti.
+ */
+export async function estimatePricesByRetailer(
+  ingredientName: string,
+  quantity: number | null,
+  unit: string | null,
+): Promise<RetailerPrice[]> {
+  const retailerList = PRICE_COMPARISON_RETAILERS.join(", ");
+  const systemPrompt = `Tu compares le prix approximatif d'un ingrédient de cuisine dans différentes enseignes de supermarché françaises, pour aider à savoir où c'est le moins cher.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après, respectant exactement ce schéma :
+{"retailers": [{"name": string, "price": nombre}]}
+Donne une ligne pour CHACUNE de ces enseignes, dans cet ordre : ${retailerList}.
+"price" est un prix réaliste en euros pour la quantité demandée, qui reflète le positionnement tarifaire connu de chaque enseigne (les enseignes discount comme Lidl et Aldi sont en général moins chères, Carrefour/Auchan/E.Leclerc/Intermarché sont proches les uns des autres). Varie légèrement les prix entre enseignes plutôt que de mettre la même valeur partout.`;
+
+  const qtyText = quantity != null ? `${quantity}${unit ? " " + unit : ""} de ` : "";
+  const parsed = await callAiJson(systemPrompt, `${qtyText}${ingredientName}`, 300);
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const rows = Array.isArray(obj.retailers) ? (obj.retailers as Record<string, unknown>[]) : [];
+
+  const byName = new Map(
+    rows
+      .filter((r) => r && typeof r.name === "string" && typeof r.price === "number" && r.price >= 0)
+      .map((r) => [String(r.name), r.price as number]),
+  );
+
+  return PRICE_COMPARISON_RETAILERS.filter((name) => byName.has(name)).map((name) => ({
+    retailer: name,
+    price: byName.get(name)!,
+  }));
+}
+
 export interface AssistantMessage {
   role: "user" | "assistant";
   content: string;
@@ -250,7 +292,7 @@ export async function chatWithAssistant(
   history: AssistantMessage[],
   userMessage: string,
 ): Promise<string> {
-  const systemPrompt = `Tu es Mamacita, l'assistante de cuisine intégrée à l'application locale "Cooking Mamacita". Tu es chaleureuse, familière et concise (2 à 4 phrases maximum).
+  const systemPrompt = `Tu es Mamacita, l'assistante de cuisine intégrée à l'application "Cooking Mamacita". Tu es chaleureuse, familière et concise (2 à 4 phrases maximum).
 Règle absolue : tutoie toujours l'utilisateur, ne dis jamais "vous".
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"reply": string}
 
@@ -269,4 +311,51 @@ Règle absolue : si l'utilisateur te salue, fait la conversation ou dit quelque 
   return typeof obj.reply === "string" && obj.reply.trim()
     ? obj.reply.trim()
     : "Désolée, je n'ai pas bien compris — tu peux reformuler ?";
+}
+
+export interface ReceiptItem {
+  name: string;
+  quantity: number | null;
+  price: number | null;
+}
+
+/** Envoie la photo d'un ticket de caisse à l'IA (Claude sait lire une image directement) pour en extraire les articles achetés. */
+export async function scanReceipt(imageBase64: string, mediaType: string): Promise<ReceiptItem[]> {
+  const systemPrompt = `Tu lis une photo de ticket de caisse de supermarché et tu en extrais les articles achetés.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après, respectant exactement ce schéma :
+{"items": [{"name": string, "quantity": nombre ou null, "price": nombre ou null}]}
+
+"name" est le nom du produit en français, simplifié et compréhensible pour quelqu'un qui range ses courses (pas le libellé de caisse abrégé, ex: "PDT ECOSSE 2KG" devient "pommes de terre").
+"price" est le prix payé pour la ligne, en euros.
+Ignore les lignes qui ne sont pas des articles achetés (total, sous-total, remises, moyen de paiement, numéro de ticket, TVA, adresse du magasin...).
+Si la photo est illisible ou n'est manifestement pas un ticket de caisse, réponds {"items": []}.`;
+
+  const { data, error } = await supabase.functions.invoke<{ content: string }>("ai-proxy", {
+    body: {
+      systemPrompt,
+      userMessage: "Voici la photo du ticket de caisse.",
+      numPredict: 1500,
+      image: imageBase64,
+      mediaType,
+    },
+  });
+  if (error) throw new Error(`Impossible d'analyser le ticket : ${await describeFunctionError(error)}`);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data!.content);
+  } catch {
+    throw new Error("L'IA n'a pas renvoyé un JSON valide. Réessaie avec une photo plus nette.");
+  }
+
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const items = Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]) : [];
+
+  return items
+    .filter((i) => i && typeof i === "object" && typeof i.name === "string" && i.name.trim())
+    .map((i) => ({
+      name: String(i.name).trim(),
+      quantity: typeof i.quantity === "number" && i.quantity > 0 ? i.quantity : null,
+      price: typeof i.price === "number" && i.price >= 0 ? i.price : null,
+    }));
 }
