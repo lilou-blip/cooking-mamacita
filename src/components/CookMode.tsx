@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import type { RecipeFull } from "../lib/db";
+import { formatQuantityPrefix } from "../lib/formatQuantity";
 import { extractDurationSeconds } from "../lib/stepTimer";
 import { matchIngredientsInStep } from "../lib/stepIngredients";
 import { useWakeLock } from "../lib/useWakeLock";
@@ -9,12 +10,6 @@ import "./CookMode.css";
 interface CookModeProps {
   recipe: RecipeFull;
   onClose: () => void;
-}
-
-function formatQty(quantity: number | null, unit: string | null): string {
-  if (quantity == null) return "";
-  const qty = Math.round(quantity * 100) / 100;
-  return unit ? `${qty} ${unit} ` : `${qty} `;
 }
 
 /** Assistant plein écran pour cuisiner pas-à-pas : une étape à la fois en très gros, écran qui ne s'éteint
@@ -134,7 +129,7 @@ export function CookMode({ recipe, onClose }: CookModeProps) {
             <ul>
               {matchedIngredients.map((ing) => (
                 <li key={ing.id}>
-                  {formatQty(ing.quantity, ing.unit_abbreviation)}
+                  {formatQuantityPrefix(ing.quantity, ing.unit_abbreviation)}
                   {ing.ingredient_name}
                 </li>
               ))}

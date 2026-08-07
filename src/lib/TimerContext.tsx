@@ -1,24 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { showNotification } from "./notifications";
-
-export interface TimerEntry {
-  id: string;
-  label: string;
-  totalSeconds: number;
-  remainingSeconds: number;
-  running: boolean;
-  done: boolean;
-}
-
-interface TimerContextValue {
-  timers: TimerEntry[];
-  getTimer: (id: string) => TimerEntry | undefined;
-  startTimer: (id: string, label: string, seconds: number) => void;
-  toggleRunning: (id: string) => void;
-  resetTimer: (id: string) => void;
-}
-
-const TimerContext = createContext<TimerContextValue | null>(null);
+import { TimerContext, type TimerContextValue, type TimerEntry } from "./timerTypes";
 
 /**
  * Minuteurs partagés dans toute l'app (pas juste dans le composant qui les affiche) : démarrer un minuteur
@@ -82,10 +64,4 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   );
 
   return <TimerContext.Provider value={value}>{children}</TimerContext.Provider>;
-}
-
-export function useTimers(): TimerContextValue {
-  const ctx = useContext(TimerContext);
-  if (!ctx) throw new Error("useTimers doit être utilisé à l'intérieur d'un TimerProvider");
-  return ctx;
 }

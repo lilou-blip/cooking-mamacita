@@ -1,18 +1,13 @@
 import { useState } from "react";
 import { useAsyncEffect } from "../lib/useAsyncEffect";
 import { getRecipeById, type RecipeCard, type RecipeFull } from "../lib/db";
+import { formatQuantityPrefix } from "../lib/formatQuantity";
 import { LoadingScreen } from "./LoadingScreen";
 import "./RecipeBookExport.css";
 
 interface RecipeBookExportProps {
   recipes: RecipeCard[];
   onClose: () => void;
-}
-
-function formatQty(quantity: number | null, unit: string | null): string {
-  if (quantity == null) return "";
-  const qty = Math.round(quantity * 100) / 100;
-  return unit ? `${qty} ${unit} ` : `${qty} `;
 }
 
 /** Fiche imprimable de tout le carnet : pas de nouvelle dépendance PDF, on s'appuie sur l'impression
@@ -65,7 +60,7 @@ export function RecipeBookExport({ recipes, onClose }: RecipeBookExportProps) {
                 <ul>
                   {recipe.ingredients.map((ing) => (
                     <li key={ing.id}>
-                      {formatQty(ing.quantity, ing.unit_abbreviation)}
+                      {formatQuantityPrefix(ing.quantity, ing.unit_abbreviation)}
                       {ing.ingredient_name}
                     </li>
                   ))}

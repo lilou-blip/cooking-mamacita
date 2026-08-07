@@ -1,4 +1,4 @@
-import { useTimers } from "../lib/TimerContext";
+import { useTimers } from "../lib/useTimers";
 import { formatTimer } from "../lib/stepTimer";
 import "./FloatingTimerBar.css";
 
