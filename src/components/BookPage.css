@@ -189,12 +189,36 @@
 .book-page__missing {
   background: var(--color-blush);
   color: var(--color-groseille-deep);
-  border-radius: var(--radius-tag);
-  padding: 8px 14px;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
   margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.book-page__missing p {
+  margin: 0;
   font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.4;
+}
+.book-page__missing-add {
+  background: var(--color-white);
+  color: var(--color-groseille-deep);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.book-page__missing-add:hover {
+  background: var(--color-cream);
+}
+.book-page__missing-add:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .book-page__ingredients ul {
   list-style: none;

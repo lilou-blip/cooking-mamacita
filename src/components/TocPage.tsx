@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getCookableRecipeIds, listAllTags, type RecipeCard, type Tag } from "../lib/db";
 import { TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "../lib/constants";
 import { getCurrentSeason, seasonEmoji } from "../lib/seasons";
@@ -12,9 +12,10 @@ interface TocPageProps {
   onSelect: (id: number) => void;
   onAddNew: () => void;
   onImport: () => void;
+  onDuplicate: (id: number) => void | Promise<void>;
 }
 
-export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: TocPageProps) {
+export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onDuplicate }: TocPageProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
@@ -22,6 +23,18 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
   const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
   const [cookableIds, setCookableIds] = useState<Set<number> | null>(null);
   const [showOnlyCookable, setShowOnlyCookable] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+
+  async function handleDuplicateClick(e: MouseEvent, id: number) {
+    e.stopPropagation();
+    if (duplicatingId != null) return;
+    setDuplicatingId(id);
+    try {
+      await onDuplicate(id);
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
 
   useEffect(() => {
     listAllTags().then(setAllTags);
@@ -147,7 +160,7 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
 
       <ul className="toc-page__list">
         {visibleRecipes.map((recipe, i) => (
-          <li key={recipe.id}>
+          <li key={recipe.id} className="toc-page__row">
             <button
               type="button"
               className={`toc-page__item${selectedId === recipe.id ? " toc-page__item--active" : ""}`}
@@ -156,6 +169,16 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
               <span className="toc-page__item-number">{i + 1}</span>
               <span className="toc-page__item-title">{recipe.title}</span>
               {recipe.tags[0] && <span className="toc-page__item-tag">{recipe.tags[0].name}</span>}
+            </button>
+            <button
+              type="button"
+              className="toc-page__duplicate"
+              onClick={(e) => handleDuplicateClick(e, recipe.id)}
+              disabled={duplicatingId === recipe.id}
+              aria-label={`Dupliquer ${recipe.title}`}
+              title="Dupliquer"
+            >
+              {duplicatingId === recipe.id ? "…" : "⎘"}
             </button>
           </li>
         ))}

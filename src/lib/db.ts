@@ -316,6 +316,31 @@ export async function createRecipe(input: NewRecipe): Promise<number> {
   return inserted.id;
 }
 
+/** Copie une recette existante (titre suffixé "(copie)") pour servir de point de départ à une variante —
+ * ingrédients/tags/étapes dupliqués, ingrédients réutilisés par nom (pas de doublon créé dans la table). */
+export async function duplicateRecipe(recipeId: number): Promise<number> {
+  const recipe = await getRecipeById(recipeId);
+  if (!recipe) throw new Error("Recette introuvable.");
+
+  return createRecipe({
+    title: `${recipe.title} (copie)`,
+    photo_path: recipe.photo_path,
+    prep_time_minutes: recipe.prep_time_minutes,
+    cook_time_minutes: recipe.cook_time_minutes,
+    servings: recipe.servings,
+    notes: recipe.notes,
+    source: recipe.source,
+    tags: recipe.tags.map((t) => ({ category: t.category, name: t.name })),
+    ingredients: recipe.ingredients.map((ing) => ({
+      name: ing.ingredient_name,
+      quantity: ing.quantity,
+      unit_abbreviation: ing.unit_abbreviation,
+      note: ing.note,
+    })),
+    steps: [...recipe.steps].sort((a, b) => a.step_number - b.step_number).map((s) => s.instruction),
+  });
+}
+
 export async function updateRecipe(id: number, input: NewRecipe): Promise<void> {
   unwrap(
     await supabase

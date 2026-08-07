@@ -4,6 +4,7 @@ import {
   countRecipeMade,
   createPantryItem,
   deleteRecipe,
+  duplicateRecipe,
   getRecipeById,
   listProfiles,
   listRecipesWithTags,
@@ -219,6 +220,21 @@ function App({ onLogout }: AppProps) {
     setView("form");
   }
 
+  /** Duplique puis ouvre directement la copie en édition (renommer/adapter la variante tout de suite,
+   * plutôt que de d'abord l'ouvrir en lecture comme après une création classique). */
+  async function handleDuplicate(id: number) {
+    const newId = await duplicateRecipe(id);
+    const list = await refreshRecipes();
+    const index = list.findIndex((r) => r.id === newId);
+    setCurrentIndex(index === -1 ? 0 : index);
+    const full = await getRecipeById(newId);
+    setCurrentRecipe(full);
+    setEditingRecipe(full);
+    setImportDraft(null);
+    setSelectedTocId(newId);
+    setView("form");
+  }
+
   function handleImportClick() {
     setView("import");
   }
@@ -369,6 +385,7 @@ function App({ onLogout }: AppProps) {
               onSelect={openMobile}
               onAddNew={handleAddNew}
               onImport={handleImportClick}
+              onDuplicate={handleDuplicate}
             />
           </div>
         </div>
@@ -413,6 +430,7 @@ function App({ onLogout }: AppProps) {
               onSelect={setSelectedTocId}
               onAddNew={handleAddNew}
               onImport={handleImportClick}
+              onDuplicate={handleDuplicate}
             />
           }
           right={<RecipePreviewPage recipe={selectedTocRecipe} onOpen={() => openFromToc()} />}

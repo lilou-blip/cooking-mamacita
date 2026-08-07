@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import {
+  addShoppingListItem,
   getMissingIngredientsForRecipe,
   getOrCreateRecipeShareToken,
+  getOrCreateStandaloneShoppingList,
   type MissingIngredient,
   type RecipeFull,
   type RecipeIngredientView,
@@ -33,6 +35,8 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [estimatingCost, setEstimatingCost] = useState(false);
   const [shareStatus, setShareStatus] = useState<"idle" | "loading" | "copied" | "error">("idle");
   const [missing, setMissing] = useState<MissingIngredient[] | null>(null);
+  const [addingToList, setAddingToList] = useState(false);
+  const [addedToList, setAddedToList] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +47,25 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
       cancelled = true;
     };
   }, [recipe.id, servings]);
+
+  async function handleAddMissingToList() {
+    if (!missing || missing.length === 0) return;
+    setAddingToList(true);
+    try {
+      const listId = await getOrCreateStandaloneShoppingList();
+      for (const m of missing) {
+        await addShoppingListItem(listId, {
+          ingredient_name: m.ingredient_name,
+          quantity: m.quantity,
+          unit_abbreviation: m.unit_abbreviation,
+        });
+      }
+      setAddedToList(true);
+      setTimeout(() => setAddedToList(false), 2500);
+    } finally {
+      setAddingToList(false);
+    }
+  }
 
   async function handleShare() {
     setShareStatus("loading");
@@ -160,12 +183,22 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
           )}
         </div>
         {missing && missing.length > 0 && (
-          <p className="book-page__missing">
-            ⚠️ Il te manque :{" "}
-            {missing
-              .map((m) => `${m.quantity}${m.unit_abbreviation ? ` ${m.unit_abbreviation}` : ""} ${m.ingredient_name}`)
-              .join(", ")}
-          </p>
+          <div className="book-page__missing">
+            <p>
+              ⚠️ Il te manque :{" "}
+              {missing
+                .map((m) => `${m.quantity}${m.unit_abbreviation ? ` ${m.unit_abbreviation}` : ""} ${m.ingredient_name}`)
+                .join(", ")}
+            </p>
+            <button
+              type="button"
+              className="book-page__missing-add"
+              onClick={handleAddMissingToList}
+              disabled={addingToList}
+            >
+              {addedToList ? "Ajouté !" : addingToList ? "Ajout..." : "🛒 Ajouter à la liste de courses"}
+            </button>
+          </div>
         )}
         <ul>
           {recipe.ingredients.map((ing) => (
