@@ -11,6 +11,29 @@
   margin: 0 0 16px;
 }
 
+.toc-page__season {
+  display: block;
+  width: 100%;
+  background: var(--color-blush);
+  border: none;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  color: var(--color-groseille-deep);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: center;
+}
+.toc-page__season:hover {
+  background: var(--color-blush-deep);
+}
+.toc-page__season--active {
+  background: var(--color-groseille);
+  color: var(--color-white);
+}
+
 .toc-page__controls {
   display: flex;
   flex-wrap: wrap;

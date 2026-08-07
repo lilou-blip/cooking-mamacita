@@ -39,7 +39,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return Notification.requestPermission();
 }
 
-async function showNotification(title: string, options: NotificationOptions): Promise<void> {
+export async function showNotification(title: string, options: NotificationOptions): Promise<void> {
   if (!isNotificationSupported() || Notification.permission !== "granted") return;
   const reg = await navigator.serviceWorker.ready;
   await reg.showNotification(title, { icon: "/pwa-192.png", badge: "/pwa-192.png", ...options });

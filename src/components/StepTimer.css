@@ -1,0 +1,46 @@
+.step-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-tag);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.step-timer--start {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  border: none;
+  cursor: pointer;
+}
+.step-timer--start:hover {
+  background: var(--color-blush-deep);
+}
+
+.step-timer--active {
+  background: var(--color-cream-deep);
+  color: var(--color-ink);
+}
+.step-timer__clock {
+  min-width: 2.6em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-timer--done {
+  background: var(--color-groseille);
+  color: var(--color-white);
+}
+
+.step-timer button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 2px;
+  line-height: 1;
+}

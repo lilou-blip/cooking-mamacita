@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listAllTags, type RecipeCard, type Tag } from "../lib/db";
 import { TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "../lib/constants";
+import { getCurrentSeason, seasonEmoji } from "../lib/seasons";
 import "./TocPage.css";
 
 type SortBy = "date" | "alpha" | "made";
@@ -23,6 +24,18 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
   useEffect(() => {
     listAllTags().then(setAllTags);
   }, []);
+
+  const currentSeason = getCurrentSeason();
+  const seasonTag = allTags.find((t) => t.category === "saison" && t.name === currentSeason);
+  const seasonRecipeCount = seasonTag
+    ? recipes.filter((r) => r.tags.some((t) => t.id === seasonTag.id)).length
+    : 0;
+  const seasonFilterActive = seasonTag != null && selectedTagIds.size === 1 && selectedTagIds.has(seasonTag.id);
+
+  function toggleSeasonFilter() {
+    if (!seasonTag) return;
+    setSelectedTagIds(seasonFilterActive ? new Set() : new Set([seasonTag.id]));
+  }
 
   function toggleTag(id: number) {
     setSelectedTagIds((prev) => {
@@ -61,6 +74,16 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
   return (
     <div className="toc-page">
       <h1 className="toc-page__title">Sommaire</h1>
+
+      {seasonTag && seasonRecipeCount > 0 && (
+        <button
+          type="button"
+          className={`toc-page__season${seasonFilterActive ? " toc-page__season--active" : ""}`}
+          onClick={toggleSeasonFilter}
+        >
+          {seasonEmoji(currentSeason)} Recettes de saison ({seasonRecipeCount})
+        </button>
+      )}
 
       <div className="toc-page__controls">
         <input

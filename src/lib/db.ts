@@ -315,6 +315,19 @@ export async function deleteRecipe(id: number): Promise<void> {
   unwrap(await supabase.from("recipes").delete().eq("id", id));
 }
 
+/** Réutilise le lien de partage existant pour cette recette s'il y en a déjà un, sinon en crée un nouveau. */
+export async function getOrCreateRecipeShareToken(recipeId: number): Promise<string> {
+  const existing = unwrap<{ token: string }[]>(
+    await supabase.from("recipe_shares").select("token").eq("recipe_id", recipeId).limit(1),
+  );
+  if (existing[0]) return existing[0].token;
+
+  const created = unwrap<{ token: string }[]>(
+    await supabase.from("recipe_shares").insert({ recipe_id: recipeId }).select("token"),
+  );
+  return created[0].token;
+}
+
 export interface Profile {
   id: number;
   name: string;

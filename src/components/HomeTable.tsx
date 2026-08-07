@@ -3,7 +3,7 @@ import pantryBasket from "../assets/illustrations/pantry-basket.webp";
 import menuCalendar from "../assets/illustrations/menu-calendar.webp";
 import statsNotebook from "../assets/illustrations/stats-notebook.webp";
 import shoppingListImg from "../assets/illustrations/shopping-list.webp";
-import batchCookingImg from "../assets/illustrations/batch-cooking.svg";
+import batchCookingImg from "../assets/illustrations/batch-cooking.webp";
 import tableBackground from "../assets/illustrations/table-background.webp";
 import "./HomeTable.css";
 

@@ -1,5 +1,7 @@
 import type { Profile, RecipeFull, StorageUnit } from "../lib/db";
+import { extractDurationSeconds } from "../lib/stepTimer";
 import { SprigDoodle } from "./SprigDoodle";
+import { StepTimer } from "./StepTimer";
 import "./BookPage.css";
 
 interface RecipeStepsPageProps {
@@ -42,12 +44,18 @@ export function RecipeStepsPage({
       <h2 className="book-page__steps-title">Préparation</h2>
 
       <ol className="book-page__steps">
-        {recipe.steps.map((step) => (
-          <li key={step.id} className="step-card">
-            <span className="step-card__number">{step.step_number}</span>
-            <p>{step.instruction}</p>
-          </li>
-        ))}
+        {recipe.steps.map((step) => {
+          const duration = extractDurationSeconds(step.instruction);
+          return (
+            <li key={step.id} className="step-card">
+              <span className="step-card__number">{step.step_number}</span>
+              <div>
+                <p>{step.instruction}</p>
+                {duration != null && <StepTimer seconds={duration} />}
+              </div>
+            </li>
+          );
+        })}
       </ol>
 
       {recipe.notes && (

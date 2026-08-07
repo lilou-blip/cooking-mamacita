@@ -145,6 +145,40 @@
   color: var(--color-groseille-deep);
   margin: 0 0 8px;
 }
+.book-page__ingredients-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.book-page__ingredients-header h2 {
+  margin: 0;
+}
+.book-page__cost-btn {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.book-page__cost-btn:hover {
+  background: var(--color-blush-deep);
+}
+.book-page__cost-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.book-page__cost {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--color-groseille-deep);
+  white-space: nowrap;
+}
 .book-page__ingredients ul {
   list-style: none;
   margin: 0;
