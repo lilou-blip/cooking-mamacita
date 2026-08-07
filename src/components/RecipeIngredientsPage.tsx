@@ -16,6 +16,11 @@ import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
 import "./BookPage.css";
 
+function formatPortionCost(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded < 1 ? rounded.toFixed(2) : rounded.toFixed(rounded % 1 === 0 ? 0 : 2);
+}
+
 function formatQuantity(ing: RecipeIngredientView, scale: number): string {
   if (ing.quantity == null) return "";
   const qty = Math.round(ing.quantity * scale * 100) / 100;
@@ -238,6 +243,12 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
           {cost ? (
             <span className="book-page__cost">
               💰 ~{cost.low === cost.high ? `${cost.low}` : `${cost.low}-${cost.high}`}€
+              <span className="book-page__cost-portion">
+                (~
+                {formatPortionCost(cost.low / servings)}
+                {cost.low !== cost.high && `-${formatPortionCost(cost.high / servings)}`}
+                €/portion)
+              </span>
             </span>
           ) : (
             <button type="button" className="book-page__cost-btn" onClick={handleEstimateCost} disabled={estimatingCost}>

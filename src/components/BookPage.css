@@ -204,6 +204,12 @@
   color: var(--color-groseille-deep);
   white-space: nowrap;
 }
+.book-page__cost-portion {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  margin-left: 4px;
+}
 
 .book-page__nutrition-detail {
   margin: 2px 0 10px;
