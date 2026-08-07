@@ -157,6 +157,16 @@ function App({ onLogout, initialSharedImport }: AppProps) {
     setTurning(null);
   }
 
+  /** Quitter le carnet vers la table doit toujours repartir du sommaire au prochain retour, plutôt que de
+   * rouvrir sur la dernière recette consultée (currentIndex/selectedTocId restaient sinon en mémoire). */
+  function exitCarnet() {
+    setView("toc");
+    setCurrentIndex(0);
+    setSelectedTocId(null);
+    setCurrentRecipe(null);
+    setSection("table");
+  }
+
   const goTo = useCallback(
     async (index: number) => {
       if (turning || index < 0 || index >= recipes.length || index === currentIndex) return;
@@ -189,7 +199,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
       if (e.key === "ArrowLeft") handlePrev();
       if (e.key === "Escape") {
         if (view === "book") closeToToc();
-        else setSection("table");
+        else exitCarnet();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -401,7 +411,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
       }
       return (
         <div className="mobile-carnet">
-          <button className="book-nav__back" onClick={() => setSection("table")}>
+          <button className="book-nav__back" onClick={exitCarnet}>
             ← Table
           </button>
           <div className="mobile-book-page">
@@ -470,7 +480,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
     return (
       <div className="book-nav">
         <div className="book-nav__toolbar">
-          <button className="book-nav__back" onClick={() => setSection("table")}>
+          <button className="book-nav__back" onClick={exitCarnet}>
             ← Table
           </button>
         </div>
