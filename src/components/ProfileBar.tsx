@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import type { Profile } from "../lib/db";
 import { getAvatarUrl, listAvatarOptions } from "../lib/avatarIllustrations";
+import { ConfirmDialog } from "./ConfirmDialog";
 import "./ProfileBar.css";
 
 interface ProfileBarProps {
@@ -38,6 +39,7 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
   const [dietaryNotes, setDietaryNotes] = useState("");
   const [age, setAge] = useState("");
   const [isGuest, setIsGuest] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const avatarOptions = listAvatarOptions();
 
   function startAdd() {
@@ -73,9 +75,9 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
     setMode({ kind: "none" });
   }
 
-  async function handleDelete() {
+  async function confirmDelete() {
     if (mode.kind !== "edit") return;
-    if (!window.confirm("Supprimer ce profil ? Ses assignations et associations seront retirées.")) return;
+    setConfirmingDelete(false);
     await onDelete?.(mode.id);
     setMode({ kind: "none" });
   }
@@ -165,7 +167,7 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
             OK
           </button>
           {mode.kind === "edit" && onDelete && (
-            <button type="button" className="profile-bar__delete" onClick={handleDelete}>
+            <button type="button" className="profile-bar__delete" onClick={() => setConfirmingDelete(true)}>
               Supprimer
             </button>
           )}
@@ -182,6 +184,14 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
         <button className="profile-bar__add" onClick={startAdd}>
           + Profil
         </button>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          message='Supprimer ce profil ? Ses assignations et associations seront retirées.'
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
     </div>
   );

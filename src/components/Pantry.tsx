@@ -13,6 +13,7 @@ import {
 import { PantryForm } from "./PantryForm";
 import { PantryShelfItem } from "./PantryShelfItem";
 import { LoadingScreen } from "./LoadingScreen";
+import { ConfirmDialog } from "./ConfirmDialog";
 import "./Pantry.css";
 
 interface PantryProps {
@@ -31,6 +32,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
   const [consumingId, setConsumingId] = useState<number | null>(null);
   const [consumeValue, setConsumeValue] = useState("");
   const [consumeProfileId, setConsumeProfileId] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState<{ id: number; title: string } | null>(null);
 
   const refresh = useCallback(async () => {
     const [itemList, profileList, unitList] = await Promise.all([listPantryItems(), listProfiles(), listStorageUnits()]);
@@ -46,9 +48,10 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
     })();
   }, [refresh]);
 
-  async function handleDelete(id: number, title: string) {
-    if (!window.confirm(`Retirer "${title}" du garde-manger ?`)) return;
-    await deletePantryItem(id);
+  async function confirmDelete() {
+    if (!confirmingDelete) return;
+    await deletePantryItem(confirmingDelete.id);
+    setConfirmingDelete(null);
     await refresh();
   }
 
@@ -132,12 +135,20 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
               consumeProfileId={consumeProfileId}
               onConsumeProfileChange={setConsumeProfileId}
               onConfirmConsume={() => confirmConsume(item)}
-              onDelete={() => handleDelete(item.id, item.ingredient_name)}
+              onDelete={() => setConfirmingDelete({ id: item.id, title: item.ingredient_name })}
               onAdjust={(delta) => handleAdjust(item.id, delta)}
             />
           ))
         )}
       </div>
+      {confirmingDelete && (
+        <ConfirmDialog
+          message={`Retirer "${confirmingDelete.title}" du garde-manger ?`}
+          confirmLabel="Retirer"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDelete(null)}
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from "../lib/db";
 import { ShoppingList } from "./ShoppingList";
 import { LoadingScreen } from "./LoadingScreen";
+import { ConfirmDialog } from "./ConfirmDialog";
 import "./ShoppingLists.css";
 
 interface ShoppingListsProps {
@@ -21,6 +22,7 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState<{ id: number; name: string } | null>(null);
 
   const refresh = useCallback(async () => {
     setLists(await listShoppingLists());
@@ -49,9 +51,10 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
     await refresh();
   }
 
-  async function handleDelete(id: number, name: string) {
-    if (!window.confirm(`Supprimer la liste "${name}" ? Cette action est irréversible.`)) return;
-    await deleteShoppingList(id);
+  async function confirmDelete() {
+    if (!confirmingDelete) return;
+    await deleteShoppingList(confirmingDelete.id);
+    setConfirmingDelete(null);
     await refresh();
   }
 
@@ -112,7 +115,7 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
                   type="button"
                   className="shopping-lists__delete"
                   aria-label="Supprimer"
-                  onClick={() => handleDelete(list.id, list.name)}
+                  onClick={() => setConfirmingDelete({ id: list.id, name: list.name })}
                 >
                   ×
                 </button>
@@ -135,6 +138,14 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
           </button>
         </div>
       </div>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          message={`Supprimer la liste "${confirmingDelete.name}" ? Cette action est irréversible.`}
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDelete(null)}
+        />
+      )}
     </div>
   );
 }

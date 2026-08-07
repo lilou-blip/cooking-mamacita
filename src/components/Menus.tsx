@@ -21,6 +21,7 @@ import { WeeklyMenuGrid } from "./WeeklyMenuGrid";
 import { MenuSuggestions } from "./MenuSuggestions";
 import { WeekSummary } from "./WeekSummary";
 import { LoadingScreen } from "./LoadingScreen";
+import { ConfirmDialog } from "./ConfirmDialog";
 import "./Menus.css";
 
 type SubView = "list" | "detail";
@@ -48,6 +49,7 @@ export function Menus({ onBack }: MenusProps) {
   const [formInitialType, setFormInitialType] = useState<MenuType>("evenement");
 
   const [shoppingListId, setShoppingListId] = useState<number | null>(null);
+  const [confirmingDeleteMenu, setConfirmingDeleteMenu] = useState(false);
 
   const refreshMenus = useCallback(async () => {
     const list = await listMenus();
@@ -96,9 +98,10 @@ export function Menus({ onBack }: MenusProps) {
     await refreshCurrentMenu();
   }
 
-  async function handleDeleteMenu(id: number) {
-    if (!window.confirm("Supprimer ce menu ?")) return;
-    await deleteMenu(id);
+  async function confirmDeleteMenu() {
+    if (!currentMenu) return;
+    setConfirmingDeleteMenu(false);
+    await deleteMenu(currentMenu.id);
     await refreshMenus();
     setCurrentMenu(null);
     setSubView("list");
@@ -208,7 +211,7 @@ export function Menus({ onBack }: MenusProps) {
         <div className="menu-detail__footer">
           <button
             className="book-nav__action book-nav__action--danger"
-            onClick={() => handleDeleteMenu(currentMenu.id)}
+            onClick={() => setConfirmingDeleteMenu(true)}
           >
             Supprimer le menu
           </button>
@@ -216,6 +219,13 @@ export function Menus({ onBack }: MenusProps) {
             Générer la liste de courses
           </button>
         </div>
+        {confirmingDeleteMenu && (
+          <ConfirmDialog
+            message="Supprimer ce menu ?"
+            onConfirm={confirmDeleteMenu}
+            onCancel={() => setConfirmingDeleteMenu(false)}
+          />
+        )}
       </div>
     );
   }

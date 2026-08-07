@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 import assistantAvatar from "../assets/illustrations/ai-assistant.webp";
+import tableBackground from "../assets/illustrations/table-background.webp";
 import "./Login.css";
 
 type Mode = "signin" | "signup";
@@ -34,7 +35,7 @@ export function Login() {
   }
 
   return (
-    <div className="login">
+    <div className="login" style={{ backgroundImage: `url(${tableBackground})` }}>
       <form className="login__card" onSubmit={handleSubmit}>
         <img src={assistantAvatar} alt="" className="login__avatar" />
         <h1>Cooking Mamacita</h1>

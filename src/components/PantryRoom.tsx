@@ -6,6 +6,7 @@ import pantryBackground from "../assets/illustrations/pantry-background.webp";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
 import { ReceiptScanner } from "./ReceiptScanner";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LoadingScreen } from "./LoadingScreen";
 import "./PantryRoom.css";
@@ -38,6 +39,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const [videFrigoLoading, setVideFrigoLoading] = useState(false);
   const [videFrigoError, setVideFrigoError] = useState<string | null>(null);
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
+  const [confirmingDeleteUnit, setConfirmingDeleteUnit] = useState<StorageUnit | null>(null);
 
   const refresh = useCallback(async () => {
     const [unitList, itemList] = await Promise.all([listStorageUnits(), listPantryItems()]);
@@ -91,15 +93,10 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
     }
   }
 
-  async function handleDeleteUnit(unit: StorageUnit) {
-    if (
-      !window.confirm(
-        `Supprimer le meuble "${unit.name}" ? Les aliments qu'il contient resteront dans le garde-manger, juste sans emplacement.`,
-      )
-    ) {
-      return;
-    }
-    await deleteStorageUnit(unit.id);
+  async function confirmDeleteUnit() {
+    if (!confirmingDeleteUnit) return;
+    await deleteStorageUnit(confirmingDeleteUnit.id);
+    setConfirmingDeleteUnit(null);
     await refresh();
   }
 
@@ -158,7 +155,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
                 className="pantry-room__unit-delete"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteUnit(unit);
+                  setConfirmingDeleteUnit(unit);
                 }}
                 aria-label={`Supprimer ${unit.name}`}
                 title={`Supprimer ${unit.name}`}
@@ -204,6 +201,14 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
             setShowReceiptScanner(false);
             refresh();
           }}
+        />
+      )}
+
+      {confirmingDeleteUnit && (
+        <ConfirmDialog
+          message={`Supprimer le meuble "${confirmingDeleteUnit.name}" ? Les aliments qu'il contient resteront dans le garde-manger, juste sans emplacement.`}
+          onConfirm={confirmDeleteUnit}
+          onCancel={() => setConfirmingDeleteUnit(null)}
         />
       )}
     </div>

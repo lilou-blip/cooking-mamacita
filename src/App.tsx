@@ -19,6 +19,7 @@ import { recipeAccentColor } from "./lib/recipeAccent";
 import { HomeTable } from "./components/HomeTable";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { AiAssistant } from "./components/AiAssistant";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import type { RecipeDraft } from "./lib/ollama";
 import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
 
@@ -73,6 +74,7 @@ function App({ onLogout }: AppProps) {
   const [leftoverPortions, setLeftoverPortions] = useState("");
   const [leftoverStorageUnitId, setLeftoverStorageUnitId] = useState<number | "">("");
   const [turning, setTurning] = useState<TurnDirection | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [notifPermission, setNotifPermission] = useState(notificationPermission());
   const touchStartX = useRef<number | null>(null);
   const isMobile = useIsMobile();
@@ -291,9 +293,14 @@ function App({ onLogout }: AppProps) {
     setTimeout(() => setJustMade(false), 2000);
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!currentRecipe) return;
-    if (!window.confirm(`Supprimer "${currentRecipe.title}" ? Cette action est irréversible.`)) return;
+    setConfirmingDelete(true);
+  }
+
+  async function confirmDeleteRecipe() {
+    if (!currentRecipe) return;
+    setConfirmingDelete(false);
     await deleteRecipe(currentRecipe.id);
     await refreshRecipes();
     setCurrentRecipe(null);
@@ -479,6 +486,13 @@ function App({ onLogout }: AppProps) {
         section={section}
         currentRecipeTitle={section === "carnet" && view === "book" ? currentRecipe?.title : undefined}
       />
+      {confirmingDelete && currentRecipe && (
+        <ConfirmDialog
+          message={`Supprimer "${currentRecipe.title}" ? Cette action est irréversible.`}
+          onConfirm={confirmDeleteRecipe}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </>
   );
 }
