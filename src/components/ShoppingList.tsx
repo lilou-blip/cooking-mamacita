@@ -12,7 +12,7 @@ import {
   type StorageUnit,
   type Unit,
 } from "../lib/db";
-import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/ollama";
+import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/assistant";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import { LoadingScreen } from "./LoadingScreen";
@@ -34,7 +34,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   const [loading, setLoading] = useState(true);
   const [estimatingId, setEstimatingId] = useState<number | null>(null);
   const [estimatingAll, setEstimatingAll] = useState(false);
-  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparison, setComparison] = useState<RetailerTotal[] | null>(null);
@@ -67,42 +67,62 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   }, [refresh]);
 
   async function toggleChecked(itemId: number, checked: boolean) {
-    await updateShoppingListItem(itemId, { checked });
-    if (checked) {
-      setTransferringId(itemId);
-      setTransferExpiry("");
-    } else if (transferringId === itemId) {
-      setTransferringId(null);
+    setError(null);
+    try {
+      await updateShoppingListItem(itemId, { checked });
+      if (checked) {
+        setTransferringId(itemId);
+        setTransferExpiry("");
+      } else if (transferringId === itemId) {
+        setTransferringId(null);
+      }
+      await refresh();
+    } catch (err) {
+      setError(String(err));
     }
-    await refresh();
   }
 
   async function handleTransfer(item: ShoppingListItem, storageUnitId: number | null) {
-    await createPantryItem({
-      ingredient_name: item.ingredient_name,
-      quantity: item.quantity ?? 1,
-      unit_abbreviation: item.unit_abbreviation,
-      storage_unit_id: storageUnitId,
-      expires_at: transferExpiry || null,
-      assignments: [],
-    });
-    await deleteShoppingListItem(item.id);
-    setTransferringId(null);
-    setTransferExpiry("");
-    invalidateComparison();
-    await refresh();
+    setError(null);
+    try {
+      await createPantryItem({
+        ingredient_name: item.ingredient_name,
+        quantity: item.quantity ?? 1,
+        unit_abbreviation: item.unit_abbreviation,
+        storage_unit_id: storageUnitId,
+        expires_at: transferExpiry || null,
+        assignments: [],
+      });
+      await deleteShoppingListItem(item.id);
+      setTransferringId(null);
+      setTransferExpiry("");
+      invalidateComparison();
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function setPrice(itemId: number, value: string) {
     const price = value.trim() ? Number(value) : null;
-    await updateShoppingListItem(itemId, { price, priceIsEstimate: false });
-    await refresh();
+    setError(null);
+    try {
+      await updateShoppingListItem(itemId, { price, priceIsEstimate: false });
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleDeleteItem(itemId: number) {
-    await deleteShoppingListItem(itemId);
-    invalidateComparison();
-    await refresh();
+    setError(null);
+    try {
+      await deleteShoppingListItem(itemId);
+      invalidateComparison();
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   function invalidateComparison() {
@@ -118,12 +138,12 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   async function handleEstimate(itemId: number, name: string, quantity: number | null, unit: string | null) {
     setEstimatingId(itemId);
-    setEstimateError(null);
+    setError(null);
     try {
       await estimateOne(itemId, name, quantity, unit);
       await refresh();
     } catch (err) {
-      setEstimateError(String(err));
+      setError(String(err));
     } finally {
       setEstimatingId(null);
     }
@@ -155,14 +175,14 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     const missing = items.filter((i) => i.price == null);
     if (missing.length === 0) return;
     setEstimatingAll(true);
-    setEstimateError(null);
+    setError(null);
     try {
       for (const item of missing) {
         await estimateOne(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation);
       }
       await refresh();
     } catch (err) {
-      setEstimateError(String(err));
+      setError(String(err));
     } finally {
       setEstimatingAll(false);
     }
@@ -170,17 +190,22 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   async function handleAddItem() {
     if (!list || !newName.trim()) return;
-    await addShoppingListItem(list.id, {
-      ingredient_name: newName.trim(),
-      quantity: newQuantity.trim() ? Number(newQuantity) : null,
-      unit_abbreviation: newUnitAbbr || null,
-    });
-    setNewName("");
-    setNewQuantity("");
-    setNewUnitAbbr("");
-    invalidateComparison();
-    const fresh = await refresh();
-    if (fresh) await estimateMissing(fresh.items);
+    setError(null);
+    try {
+      await addShoppingListItem(list.id, {
+        ingredient_name: newName.trim(),
+        quantity: newQuantity.trim() ? Number(newQuantity) : null,
+        unit_abbreviation: newUnitAbbr || null,
+      });
+      setNewName("");
+      setNewQuantity("");
+      setNewUnitAbbr("");
+      invalidateComparison();
+      const fresh = await refresh();
+      if (fresh) await estimateMissing(fresh.items);
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleExport() {
@@ -234,7 +259,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
           </button>
         )}
 
-        {estimateError && <p className="form-error">{estimateError}</p>}
+        {error && <p className="form-error">{error}</p>}
 
         {list.items.length === 0 ? (
           <p className="shopping-list__empty">Tout est déjà dans le garde-manger, rien à acheter !</p>
@@ -250,6 +275,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
                     type="checkbox"
                     checked={item.checked}
                     onChange={(e) => toggleChecked(item.id, e.target.checked)}
+                    aria-label={`${item.ingredient_name} acheté`}
                   />
                   <span className="shopping-list__qty">
                     {item.quantity != null
@@ -280,6 +306,7 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
                     placeholder="€"
                     defaultValue={item.price ?? ""}
                     onBlur={(e) => setPrice(item.id, e.target.value)}
+                    aria-label={`Prix de ${item.ingredient_name}`}
                   />
                   <button
                     type="button"

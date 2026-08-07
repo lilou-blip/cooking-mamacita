@@ -74,8 +74,9 @@ export async function checkAndNotify(): Promise<void> {
       toNotify.forEach((i) => notified.add(`${i.id}:${i.expires_at}`));
       saveNotifiedExpirySet(notified);
     }
-  } catch {
+  } catch (err) {
     // Le garde-manger n'a pas pu être chargé (hors-ligne...) : on retentera à la prochaine ouverture.
+    console.error("checkAndNotify: échec de la vérification des péremptions", err);
   }
 
   try {
@@ -91,7 +92,8 @@ export async function checkAndNotify(): Promise<void> {
       }
       localStorage.setItem(WEEKLY_REMINDER_KEY, currentWeek);
     }
-  } catch {
+  } catch (err) {
     // Idem, on retentera à la prochaine ouverture.
+    console.error("checkAndNotify: échec du rappel hebdomadaire", err);
   }
 }

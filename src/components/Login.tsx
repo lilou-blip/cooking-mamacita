@@ -6,12 +6,16 @@ import "./Login.css";
 
 type Mode = "signin" | "signup";
 
-export function Login() {
+interface LoginProps {
+  initialError?: string;
+}
+
+export function Login({ initialError }: LoginProps) {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [signupDone, setSignupDone] = useState(false);
 
   async function handleSubmit(e: FormEvent) {

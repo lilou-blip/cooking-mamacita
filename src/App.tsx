@@ -21,7 +21,7 @@ import { HomeTable } from "./components/HomeTable";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { AiAssistant } from "./components/AiAssistant";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import type { RecipeDraft } from "./lib/ollama";
+import type { RecipeDraft } from "./lib/assistant";
 import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
 
 // Sections visitées occasionnellement : chargées à la demande plutôt que dans le bundle initial,

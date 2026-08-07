@@ -123,8 +123,9 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
           step="any"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
+          aria-label="Quantité"
         />
-        <select value={unitAbbr} onChange={(e) => setUnitAbbr(e.target.value)}>
+        <select value={unitAbbr} onChange={(e) => setUnitAbbr(e.target.value)} aria-label="Unité">
           <option value="">unité</option>
           {units.map((u) => (
             <option key={u.id} value={u.abbreviation}>
@@ -132,7 +133,7 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
             </option>
           ))}
         </select>
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Catégorie">
           {INGREDIENT_CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -143,7 +144,11 @@ export function PantryForm({ profiles, storageUnits, initialUnitId, onCreated, o
           <span>Péremption</span>
           <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </label>
-        <select value={storageUnitId} onChange={(e) => setStorageUnitId(e.target.value ? Number(e.target.value) : "")}>
+        <select
+          value={storageUnitId}
+          onChange={(e) => setStorageUnitId(e.target.value ? Number(e.target.value) : "")}
+          aria-label="Emplacement"
+        >
           <option value="">Emplacement</option>
           {storageUnits.map((u) => (
             <option key={u.id} value={u.id}>

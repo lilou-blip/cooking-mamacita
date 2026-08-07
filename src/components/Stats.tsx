@@ -16,7 +16,7 @@ import {
   type TopRecipeStat,
   type WasteAvoidedItem,
 } from "../lib/db";
-import { estimatePriceRange } from "../lib/ollama";
+import { estimatePriceRange } from "../lib/assistant";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
 import { guidelineForAge } from "../lib/nutritionGuidelines";
 import { getAvatarUrl } from "../lib/avatarIllustrations";

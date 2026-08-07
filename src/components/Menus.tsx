@@ -50,6 +50,7 @@ export function Menus({ onBack }: MenusProps) {
 
   const [shoppingListId, setShoppingListId] = useState<number | null>(null);
   const [confirmingDeleteMenu, setConfirmingDeleteMenu] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshMenus = useCallback(async () => {
     const list = await listMenus();
@@ -66,50 +67,84 @@ export function Menus({ onBack }: MenusProps) {
   }, [refreshMenus]);
 
   async function openMenu(id: number) {
-    const [menu, recipes] = await Promise.all([getMenuById(id), listRecipes()]);
-    setCurrentMenu(menu);
-    setAllRecipes(recipes);
-    setShowSuggestions(false);
-    setSubView("detail");
+    setError(null);
+    try {
+      const [menu, recipes] = await Promise.all([getMenuById(id), listRecipes()]);
+      setCurrentMenu(menu);
+      setAllRecipes(recipes);
+      setShowSuggestions(false);
+      setSubView("detail");
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function refreshCurrentMenu() {
     if (!currentMenu) return;
-    setCurrentMenu(await getMenuById(currentMenu.id));
+    try {
+      setCurrentMenu(await getMenuById(currentMenu.id));
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleAddRecipe() {
     if (!currentMenu || !selectedRecipeId) return;
-    await addRecipeToMenu(currentMenu.id, Number(selectedRecipeId), Number(addServings) || 4);
-    setSelectedRecipeId("");
-    await refreshCurrentMenu();
+    setError(null);
+    try {
+      await addRecipeToMenu(currentMenu.id, Number(selectedRecipeId), Number(addServings) || 4);
+      setSelectedRecipeId("");
+      await refreshCurrentMenu();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleRemoveRecipe(menuRecipeId: number) {
-    await removeMenuRecipe(menuRecipeId);
-    await refreshCurrentMenu();
+    setError(null);
+    try {
+      await removeMenuRecipe(menuRecipeId);
+      await refreshCurrentMenu();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleToggleMade(menuRecipeId: number, recipeId: number, servings: number, made: boolean) {
-    await updateMenuRecipeMade(menuRecipeId, made);
-    if (made) {
-      await markRecipeMade(recipeId, servings);
+    setError(null);
+    try {
+      await updateMenuRecipeMade(menuRecipeId, made);
+      if (made) {
+        await markRecipeMade(recipeId, servings);
+      }
+      await refreshCurrentMenu();
+    } catch (err) {
+      setError(String(err));
     }
-    await refreshCurrentMenu();
   }
 
   async function confirmDeleteMenu() {
     if (!currentMenu) return;
     setConfirmingDeleteMenu(false);
-    await deleteMenu(currentMenu.id);
-    await refreshMenus();
-    setCurrentMenu(null);
-    setSubView("list");
+    setError(null);
+    try {
+      await deleteMenu(currentMenu.id);
+      await refreshMenus();
+      setCurrentMenu(null);
+      setSubView("list");
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleGenerateList() {
     if (!currentMenu) return;
-    setShoppingListId(await generateShoppingListForMenu(currentMenu.id));
+    setError(null);
+    try {
+      setShoppingListId(await generateShoppingListForMenu(currentMenu.id));
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   if (shoppingListId != null) {
@@ -134,6 +169,7 @@ export function Menus({ onBack }: MenusProps) {
         {currentMenu.event_date && (
           <p className="menu-detail__date">{new Date(currentMenu.event_date).toLocaleDateString("fr-FR")}</p>
         )}
+        {error && <p className="form-error">{error}</p>}
 
         {currentMenu.recipes.length > 0 && (
           <div className="menu-progress">
@@ -247,6 +283,7 @@ export function Menus({ onBack }: MenusProps) {
           {showForm ? "Fermer" : "+ Nouveau menu"}
         </button>
       </header>
+      {error && <p className="form-error">{error}</p>}
 
       <WeekSummary
         menu={weekMenu}

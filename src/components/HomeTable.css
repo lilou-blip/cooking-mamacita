@@ -146,10 +146,14 @@
 /* En dessous de 640px, la mise en scène "objets éparpillés sur la table" (pensée pour un grand écran)
    déborde et se chevauche : on bascule sur une liste verticale simple, centrée et scrollable. */
 @media (max-width: 640px) {
+  /* .home-table reste position:fixed/inset:0 (hérité de la règle de base) : la image de fond est ainsi
+     toujours calée sur la hauteur du viewport plutôt que sur celle du contenu (qui dépasse un écran
+     avec 6 objets empilés), sans quoi "cover" étire l'image jusqu'à son bord bas et révèle le fond uni
+     sous la nappe. Le contenu défile donc à l'intérieur de .home-table (overflow-y) au lieu de faire
+     défiler la page entière. */
   .home-table {
-    position: static;
-    min-height: 100vh;
-    overflow: visible;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     align-items: center;

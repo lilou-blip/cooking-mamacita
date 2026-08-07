@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createStorageUnit, deleteStorageUnit, listPantryItems, listStorageUnits, type PantryItem, type StorageUnit } from "../lib/db";
 import { getStorageIllustration, getStorageOpenBackground } from "../lib/storageIllustrations";
-import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/ollama";
+import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/assistant";
 import pantryBackground from "../assets/illustrations/pantry-background.webp";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";

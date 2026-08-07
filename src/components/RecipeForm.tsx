@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createRecipe, listAllTags, listUnits, updateRecipe, type RecipeFull, type Tag, type Unit } from "../lib/db";
 import { INGREDIENT_CATEGORIES, TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "../lib/constants";
-import type { RecipeDraft } from "../lib/ollama";
+import type { RecipeDraft } from "../lib/assistant";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import "./RecipeForm.css";
 
@@ -248,11 +248,13 @@ export function RecipeForm({ recipe, draft, onCreated, onCancel }: RecipeFormPro
               placeholder="Qté"
               value={row.quantity}
               onChange={(e) => updateIngredient(i, { quantity: e.target.value })}
+              aria-label={`Quantité (ingrédient ${i + 1})`}
             />
             <select
               className="ingredient-row__unit"
               value={row.unit_abbreviation}
               onChange={(e) => updateIngredient(i, { unit_abbreviation: e.target.value })}
+              aria-label={`Unité (ingrédient ${i + 1})`}
             >
               <option value="">unité</option>
               {units.map((u) => (
@@ -272,6 +274,7 @@ export function RecipeForm({ recipe, draft, onCreated, onCancel }: RecipeFormPro
               className="ingredient-row__category"
               value={row.category}
               onChange={(e) => updateIngredient(i, { category: e.target.value })}
+              aria-label={`Catégorie (ingrédient ${i + 1})`}
             >
               {INGREDIENT_CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>

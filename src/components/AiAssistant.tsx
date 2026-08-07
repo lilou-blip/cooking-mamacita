@@ -10,7 +10,7 @@ import {
   listRecipesWithTags,
 } from "../lib/db";
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
-import { chatWithAssistant, type AssistantMessage } from "../lib/ollama";
+import { chatWithAssistant, type AssistantMessage } from "../lib/assistant";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
 import assistantAvatar from "../assets/illustrations/ai-assistant.webp";
 import "./AiAssistant.css";

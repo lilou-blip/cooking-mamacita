@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { addRecipeToMenu, type MenuFull, type Recipe } from "../lib/db";
-import { suggestMenuRecipes, type MenuSuggestion } from "../lib/ollama";
+import { suggestMenuRecipes, type MenuSuggestion } from "../lib/assistant";
 import "./MenuSuggestions.css";
 
 interface SuggestedRecipe extends MenuSuggestion {

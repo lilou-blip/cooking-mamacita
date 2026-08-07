@@ -17,7 +17,7 @@ import {
   type RecipeIngredientView,
   type StorageUnit,
 } from "../lib/db";
-import { suggestBatchCookingPlan } from "../lib/ollama";
+import { suggestBatchCookingPlan } from "../lib/assistant";
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
 import { MEAL_SLOTS } from "../lib/constants";
 import { LoadingScreen } from "./LoadingScreen";

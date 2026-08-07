@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { createPantryItem } from "../lib/db";
-import { scanReceipt, type ReceiptItem } from "../lib/ollama";
+import { scanReceipt, type ReceiptItem } from "../lib/assistant";
 import "./ReceiptScanner.css";
 
 interface ReceiptScannerProps {

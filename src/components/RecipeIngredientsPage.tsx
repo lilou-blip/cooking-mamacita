@@ -8,7 +8,7 @@ import {
   type RecipeFull,
   type RecipeIngredientView,
 } from "../lib/db";
-import { estimatePriceRange } from "../lib/ollama";
+import { estimatePriceRange } from "../lib/assistant";
 import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
 import "./BookPage.css";

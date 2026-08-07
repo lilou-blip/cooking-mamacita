@@ -8,12 +8,16 @@ import App from "./App";
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session))
+      // Sans ce .catch, un rejet (ex: réseau indisponible au démarrage) laisserait loading à true
+      // indéfiniment : l'appli resterait bloquée sur l'écran de chargement sans jamais l'atteindre.
+      .catch(() => setSessionCheckFailed(true))
+      .finally(() => setLoading(false));
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
@@ -21,6 +25,6 @@ export function AuthGate() {
   }, []);
 
   if (loading) return <LoadingScreen />;
-  if (!session) return <Login />;
+  if (!session) return <Login initialError={sessionCheckFailed ? "Impossible de vérifier ta session. Vérifie ta connexion et reconnecte-toi." : undefined} />;
   return <App onLogout={() => supabase.auth.signOut()} />;
 }

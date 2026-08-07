@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { fetchRecipeTextFromUrl, structureRecipeFromImage, structureRecipeFromText, type RecipeDraft } from "../lib/ollama";
+import { fetchRecipeTextFromUrl, structureRecipeFromImage, structureRecipeFromText, type RecipeDraft } from "../lib/assistant";
 import "./ImportRecipe.css";
 
 interface ImportRecipeProps {

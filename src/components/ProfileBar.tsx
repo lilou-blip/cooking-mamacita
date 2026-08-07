@@ -120,6 +120,7 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="profile-bar__name"
+            aria-label="Prénom"
           />
           {avatarOptions.length > 0 && (
             <div className="profile-bar__avatars">
@@ -149,6 +150,7 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
             value={dietaryNotes}
             onChange={(e) => setDietaryNotes(e.target.value)}
             className="profile-bar__dietary-notes"
+            aria-label="Allergies / contraintes"
           />
           <input
             type="number"
@@ -158,6 +160,7 @@ export function ProfileBar({ profiles, onAdd, onUpdate, onDelete, showChips = tr
             value={age}
             onChange={(e) => setAge(e.target.value)}
             className="profile-bar__age"
+            aria-label="Âge"
           />
           <label className="profile-bar__guest">
             <input type="checkbox" checked={isGuest} onChange={(e) => setIsGuest(e.target.checked)} />

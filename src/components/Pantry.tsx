@@ -33,6 +33,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
   const [consumeValue, setConsumeValue] = useState("");
   const [consumeProfileId, setConsumeProfileId] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState<{ id: number; title: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [itemList, profileList, unitList] = await Promise.all([listPantryItems(), listProfiles(), listStorageUnits()]);
@@ -50,24 +51,39 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
 
   async function confirmDelete() {
     if (!confirmingDelete) return;
-    await deletePantryItem(confirmingDelete.id);
-    setConfirmingDelete(null);
-    await refresh();
+    setError(null);
+    try {
+      await deletePantryItem(confirmingDelete.id);
+      setConfirmingDelete(null);
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleAdjust(id: number, delta: number) {
-    await adjustPantryItemQuantity(id, delta);
-    await refresh();
+    setError(null);
+    try {
+      await adjustPantryItemQuantity(id, delta);
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function confirmConsume(item: PantryItem) {
     const qty = Number(consumeValue);
     if (!qty || qty <= 0) return;
-    await consumePantryItem(item.id, qty, consumeProfileId ? Number(consumeProfileId) : null);
-    setConsumingId(null);
-    setConsumeValue("");
-    setConsumeProfileId("");
-    await refresh();
+    setError(null);
+    try {
+      await consumePantryItem(item.id, qty, consumeProfileId ? Number(consumeProfileId) : null);
+      setConsumingId(null);
+      setConsumeValue("");
+      setConsumeProfileId("");
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
@@ -90,6 +106,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
       </button>
 
       <h1 className="pantry-themed__title">{title}</h1>
+      {error && <p className="form-error">{error}</p>}
 
       {showForm && (
         <div className="pantry-themed__form-overlay" onClick={() => setShowForm(false)}>
