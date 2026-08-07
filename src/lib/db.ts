@@ -34,6 +34,13 @@ export interface RecipeStep {
   instruction: string;
 }
 
+export interface NutritionEstimate {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
 export interface Recipe {
   id: number;
   title: string;
@@ -44,6 +51,8 @@ export interface Recipe {
   notes: string | null;
   source: string | null;
   created_at: string;
+  is_favorite: boolean;
+  nutrition_estimate: NutritionEstimate | null;
 }
 
 export interface RecipeFull extends Recipe {
@@ -368,6 +377,17 @@ export async function updateRecipe(id: number, input: NewRecipe): Promise<void> 
 
 export async function deleteRecipe(id: number): Promise<void> {
   unwrap(await supabase.from("recipes").delete().eq("id", id));
+}
+
+export async function toggleRecipeFavorite(id: number, isFavorite: boolean): Promise<void> {
+  unwrap(await supabase.from("recipes").update({ is_favorite: isFavorite }).eq("id", id));
+}
+
+/** Met en cache l'estimation nutritionnelle (IA, par portion) d'une recette, pour ne pas la
+ * recalculer à chaque fois que la fiche est rouverte — contrairement au coût, qui varie avec le
+ * nombre de portions affiché, la nutrition par portion est une propriété fixe de la recette. */
+export async function saveRecipeNutritionEstimate(id: number, estimate: NutritionEstimate): Promise<void> {
+  unwrap(await supabase.from("recipes").update({ nutrition_estimate: estimate }).eq("id", id));
 }
 
 /** Réutilise le lien de partage existant pour cette recette s'il y en a déjà un, sinon en crée un nouveau. */
@@ -890,6 +910,7 @@ export interface ShoppingListItem {
   id: number;
   ingredient_id: number;
   ingredient_name: string;
+  ingredient_category: string;
   quantity: number | null;
   unit_id: number | null;
   unit_abbreviation: string | null;
@@ -1293,13 +1314,15 @@ export async function getShoppingListById(id: number): Promise<ShoppingListFull 
       price_is_estimate: boolean;
       checked: boolean;
       is_suggested: boolean;
-      ingredients: { name: string } | null;
+      ingredients: { name: string; category: string } | null;
       units: { abbreviation: string } | null;
     }[]
   >(
     (await supabase
       .from("shopping_list_items")
-      .select("id, ingredient_id, quantity, unit_id, price, price_is_estimate, checked, is_suggested, ingredients(name), units(abbreviation)")
+      .select(
+        "id, ingredient_id, quantity, unit_id, price, price_is_estimate, checked, is_suggested, ingredients(name, category), units(abbreviation)",
+      )
       .eq("shopping_list_id", id)
       .order("name", { foreignTable: "ingredients" })) as never,
   );
@@ -1308,6 +1331,7 @@ export async function getShoppingListById(id: number): Promise<ShoppingListFull 
     id: r.id,
     ingredient_id: r.ingredient_id,
     ingredient_name: r.ingredients?.name ?? "",
+    ingredient_category: r.ingredients?.category ?? "autre",
     quantity: r.quantity,
     unit_id: r.unit_id,
     unit_abbreviation: r.units?.abbreviation ?? null,
@@ -1415,6 +1439,56 @@ export async function getTopMadeRecipes(limit = 5, profileId?: number | null): P
     .map(([recipe_id, { title, count }]) => ({ recipe_id, title, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+export interface NutritionSummary {
+  avg_calories: number;
+  recipes_with_data: number;
+  total_made: number;
+}
+
+/** Moyenne des calories par portion des recettes faites, parmi celles qui ont une estimation nutritionnelle
+ * en cache (voir estimateNutrition/saveRecipeNutritionEstimate) — ignore les recettes jamais estimées
+ * plutôt que de fausser la moyenne avec un 0, mais renvoie quand même total_made pour indiquer la
+ * couverture réelle (ex: "estimé sur 3 des 8 fois où tu as cuisiné"). */
+export async function getAverageNutrition(profileId?: number | null): Promise<NutritionSummary | null> {
+  let logIds: number[] | null = null;
+  let excludedLogIds = new Set<number>();
+  if (profileId != null) {
+    const rows = unwrap<{ consumption_log_id: number }[]>(
+      await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
+    );
+    logIds = rows.map((r) => r.consumption_log_id);
+    if (logIds.length === 0) return null;
+  } else {
+    excludedLogIds = await getGuestOnlyLogIds(await getGuestProfileIds());
+  }
+
+  let query = supabase.from("consumption_log").select("id, recipe_id, recipes(nutrition_estimate)");
+  if (logIds) query = query.in("id", logIds);
+  const rows = unwrap<{ id: number; recipe_id: number; recipes: { nutrition_estimate: NutritionEstimate | null } | null }[]>(
+    await (query as never),
+  );
+
+  let totalMade = 0;
+  let sumCalories = 0;
+  let withData = 0;
+  for (const row of rows) {
+    if (excludedLogIds.has(row.id)) continue;
+    totalMade += 1;
+    const estimate = row.recipes?.nutrition_estimate;
+    if (estimate) {
+      sumCalories += estimate.calories;
+      withData += 1;
+    }
+  }
+  if (totalMade === 0) return null;
+
+  return {
+    avg_calories: withData > 0 ? Math.round(sumCalories / withData) : 0,
+    recipes_with_data: withData,
+    total_made: totalMade,
+  };
 }
 
 export interface CategoryStat {

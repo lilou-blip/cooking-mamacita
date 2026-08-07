@@ -3,6 +3,7 @@ import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
   createProfile,
   deleteProfile,
+  getAverageNutrition,
   getConsumptionByCategory,
   getConsumptionByProfile,
   getShoppingBudgetTrend,
@@ -11,6 +12,7 @@ import {
   listProfiles,
   updateProfile,
   type CategoryStat,
+  type NutritionSummary,
   type ProfileStat,
   type Profile,
   type ShoppingBudgetPoint,
@@ -38,6 +40,7 @@ export function Stats({ onBack }: StatsProps) {
   const [topRecipes, setTopRecipes] = useState<TopRecipeStat[]>([]);
   const [byCategory, setByCategory] = useState<CategoryStat[]>([]);
   const [byProfile, setByProfile] = useState<ProfileStat[]>([]);
+  const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary | null>(null);
   const [wasteItems, setWasteItems] = useState<WasteAvoidedItem[]>([]);
   const [budgetTrend, setBudgetTrend] = useState<ShoppingBudgetPoint[]>([]);
   const [wasteValue, setWasteValue] = useState<number | null>(null);
@@ -46,14 +49,16 @@ export function Stats({ onBack }: StatsProps) {
   const [profileSwitchLoading, setProfileSwitchLoading] = useState(false);
 
   const refresh = useCallback(async (profileId: number | null) => {
-    const [recipes, categories, profileStats] = await Promise.all([
+    const [recipes, categories, profileStats, nutrition] = await Promise.all([
       getTopMadeRecipes(5, profileId),
       getConsumptionByCategory(profileId),
       getConsumptionByProfile(),
+      getAverageNutrition(profileId),
     ]);
     setTopRecipes(recipes);
     setByCategory(categories);
     setByProfile(profileStats);
+    setNutritionSummary(nutrition);
   }, []);
 
   const { loading, error: loadError } = useAsyncEffect(async () => {
@@ -246,6 +251,26 @@ export function Stats({ onBack }: StatsProps) {
               <p className="stats__empty">Pas encore assez de données.</p>
             )}
           </section>
+
+          {nutritionSummary && nutritionSummary.recipes_with_data > 0 && (
+            <section className="stats__section">
+              <h2>Nutrition estimée</h2>
+              <p className="stats__guideline-disclaimer">
+                Estimation par Mamacita, recette par recette (bouton "🔥 Estimer la nutrition" sur une fiche) —
+                pas une base de données nutritionnelle précise, une indication pour se situer.
+              </p>
+              <p className="stats__nutrition-avg">
+                ≈ <strong>{nutritionSummary.avg_calories} kcal</strong> par portion en moyenne
+                {nutritionSummary.recipes_with_data < nutritionSummary.total_made && (
+                  <>
+                    {" "}
+                    (estimé sur {nutritionSummary.recipes_with_data} des {nutritionSummary.total_made} fois où tu as
+                    cuisiné)
+                  </>
+                )}
+              </p>
+            </section>
+          )}
 
           {selectedGuideline && (
             <section className="stats__section">

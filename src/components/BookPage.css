@@ -24,6 +24,25 @@
   z-index: 2;
 }
 
+.book-page__favorite {
+  background: var(--color-white);
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+.book-page__favorite:hover {
+  color: var(--color-autumn-orange);
+}
+.book-page__favorite--active {
+  color: var(--color-autumn-orange);
+}
+
 .book-page__header {
   text-align: center;
   margin-bottom: 22px;
@@ -184,6 +203,12 @@
   font-weight: 800;
   color: var(--color-groseille-deep);
   white-space: nowrap;
+}
+
+.book-page__nutrition-detail {
+  margin: 2px 0 10px;
+  font-size: 0.76rem;
+  color: var(--color-ink-soft);
 }
 
 .book-page__missing {

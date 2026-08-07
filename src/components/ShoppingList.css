@@ -81,6 +81,21 @@
   height: 44px;
   padding: 0 2px;
 }
+
+/* Même hauteur qu'un .shopping-list__item (44px) pour rester aligné sur le pas du fond "papier ligné"
+   de .shopping-list__items, qui se répète tous les 44px depuis le haut de la liste. */
+.shopping-list__category-header {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 2px;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-groseille-deep);
+}
 .shopping-list__item--checked {
   opacity: 0.55;
 }

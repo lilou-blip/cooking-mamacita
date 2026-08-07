@@ -22,6 +22,19 @@ export default defineConfig({
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
+        // Permet de choisir "Cooking Mamacita" dans le menu "Partager" d'une autre appli (Instagram, TikTok,
+        // le navigateur...) une fois l'app installée, pour envoyer directement une URL ou un texte de recette
+        // vers l'import plutôt que de devoir copier-coller manuellement. GET (pas de Service Worker
+        // supplémentaire à écrire) : pas de partage de fichier/photo par ce biais, seulement texte/URL.
+        share_target: {
+          action: "/share-target",
+          method: "GET",
+          params: {
+            title: "title",
+            text: "text",
+            url: "url",
+          },
+        },
       },
       workbox: {
         // Les illustrations (~1 Mo au total, converties en WebP) ne sont PAS préchargées au premier lancement —

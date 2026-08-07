@@ -13,9 +13,10 @@ interface TocPageProps {
   onAddNew: () => void;
   onImport: () => void;
   onDuplicate: (id: number) => void | Promise<void>;
+  onToggleFavorite: (id: number, isFavorite: boolean) => void | Promise<void>;
 }
 
-export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onDuplicate }: TocPageProps) {
+export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onDuplicate, onToggleFavorite }: TocPageProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
@@ -23,7 +24,9 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
   const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
   const [cookableIds, setCookableIds] = useState<Set<number> | null>(null);
   const [showOnlyCookable, setShowOnlyCookable] = useState(false);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [togglingFavoriteId, setTogglingFavoriteId] = useState<number | null>(null);
 
   async function handleDuplicateClick(e: MouseEvent, id: number) {
     e.stopPropagation();
@@ -33,6 +36,17 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
       await onDuplicate(id);
     } finally {
       setDuplicatingId(null);
+    }
+  }
+
+  async function handleFavoriteClick(e: MouseEvent, id: number, isFavorite: boolean) {
+    e.stopPropagation();
+    if (togglingFavoriteId != null) return;
+    setTogglingFavoriteId(id);
+    try {
+      await onToggleFavorite(id, !isFavorite);
+    } finally {
+      setTogglingFavoriteId(null);
     }
   }
 
@@ -78,6 +92,7 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
         if (!matchesTitle && !matchesIngredient) return false;
       }
       if (showOnlyCookable && !cookableIds?.has(recipe.id)) return false;
+      if (showOnlyFavorites && !recipe.is_favorite) return false;
       return true;
     });
 
@@ -86,13 +101,15 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
       if (sortBy === "made") return b.made_count - a.made_count;
       return 0; // "date": déjà trié par date de création côté DB
     });
-  }, [recipes, search, sortBy, selectedTagIds, showOnlyCookable, cookableIds]);
+  }, [recipes, search, sortBy, selectedTagIds, showOnlyCookable, cookableIds, showOnlyFavorites]);
+
+  const favoriteCount = recipes.filter((r) => r.is_favorite).length;
 
   return (
     <div className="toc-page">
       <h1 className="toc-page__title">Sommaire</h1>
 
-      {((seasonTag && seasonRecipeCount > 0) || (cookableIds && cookableIds.size > 0)) && (
+      {((seasonTag && seasonRecipeCount > 0) || (cookableIds && cookableIds.size > 0) || favoriteCount > 0) && (
         <div className="toc-page__quick-filters">
           {seasonTag && seasonRecipeCount > 0 && (
             <button
@@ -110,6 +127,15 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
               onClick={() => setShowOnlyCookable((v) => !v)}
             >
               🍽️ Je peux faire maintenant ({cookableIds.size})
+            </button>
+          )}
+          {favoriteCount > 0 && (
+            <button
+              type="button"
+              className={`toc-page__season${showOnlyFavorites ? " toc-page__season--active" : ""}`}
+              onClick={() => setShowOnlyFavorites((v) => !v)}
+            >
+              ⭐ Favoris ({favoriteCount})
             </button>
           )}
         </div>
@@ -169,6 +195,17 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
               <span className="toc-page__item-number">{i + 1}</span>
               <span className="toc-page__item-title">{recipe.title}</span>
               {recipe.tags[0] && <span className="toc-page__item-tag">{recipe.tags[0].name}</span>}
+            </button>
+            <button
+              type="button"
+              className={`toc-page__favorite${recipe.is_favorite ? " toc-page__favorite--active" : ""}`}
+              onClick={(e) => handleFavoriteClick(e, recipe.id, recipe.is_favorite)}
+              disabled={togglingFavoriteId === recipe.id}
+              aria-label={recipe.is_favorite ? `Retirer ${recipe.title} des favoris` : `Ajouter ${recipe.title} aux favoris`}
+              aria-pressed={recipe.is_favorite}
+              title={recipe.is_favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            >
+              {recipe.is_favorite ? "★" : "☆"}
             </button>
             <button
               type="button"

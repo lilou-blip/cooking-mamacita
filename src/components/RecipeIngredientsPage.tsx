@@ -4,11 +4,14 @@ import {
   getMissingIngredientsForRecipe,
   getOrCreateRecipeShareToken,
   getOrCreateStandaloneShoppingList,
+  saveRecipeNutritionEstimate,
+  toggleRecipeFavorite,
   type MissingIngredient,
+  type NutritionEstimate,
   type RecipeFull,
   type RecipeIngredientView,
 } from "../lib/db";
-import { estimatePriceRange } from "../lib/assistant";
+import { estimateNutrition, estimatePriceRange } from "../lib/assistant";
 import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
 import "./BookPage.css";
@@ -38,6 +41,11 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [addingToList, setAddingToList] = useState(false);
   const [addedToList, setAddedToList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(recipe.is_favorite);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [nutrition, setNutrition] = useState<NutritionEstimate | null>(recipe.nutrition_estimate);
+  const [estimatingNutrition, setEstimatingNutrition] = useState(false);
+  const [nutritionError, setNutritionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,11 +137,51 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
     }
   }
 
+  async function handleToggleFavorite() {
+    const next = !isFavorite;
+    setIsFavorite(next); // optimiste : l'étoile réagit tout de suite, corrigée si l'appel échoue
+    setFavoriteError(null);
+    try {
+      await toggleRecipeFavorite(recipe.id, next);
+    } catch (err) {
+      setIsFavorite(!next);
+      setFavoriteError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleEstimateNutrition() {
+    setEstimatingNutrition(true);
+    setNutritionError(null);
+    try {
+      const estimate = await estimateNutrition(
+        recipe.title,
+        recipe.servings,
+        recipe.ingredients.map((ing) => ({ name: ing.ingredient_name, quantity: ing.quantity, unit: ing.unit_abbreviation })),
+      );
+      setNutrition(estimate);
+      await saveRecipeNutritionEstimate(recipe.id, estimate);
+    } catch (err) {
+      setNutritionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEstimatingNutrition(false);
+    }
+  }
+
   return (
     <>
       <SprigDoodle className="book-page__doodle book-page__doodle--tl" />
 
       <div className="book-page__page-actions">
+        <button
+          type="button"
+          className={`book-page__favorite${isFavorite ? " book-page__favorite--active" : ""}`}
+          onClick={handleToggleFavorite}
+          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={isFavorite}
+          title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+        >
+          {isFavorite ? "★" : "☆"}
+        </button>
         <button type="button" className="book-nav__action" onClick={onEdit}>
           Éditer
         </button>
@@ -144,6 +192,7 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
           Supprimer
         </button>
       </div>
+      {favoriteError && <p className="form-error">{favoriteError}</p>}
 
       <header className="book-page__header">
         <div className="book-page__title-tag">
@@ -195,7 +244,28 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
               {estimatingCost ? "Mamacita calcule..." : "💰 Estimer le coût"}
             </button>
           )}
+          {nutrition ? (
+            <span className="book-page__cost" title="Estimation par portion, approximative">
+              🔥 ~{nutrition.calories} kcal/portion
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="book-page__cost-btn"
+              onClick={handleEstimateNutrition}
+              disabled={estimatingNutrition}
+            >
+              {estimatingNutrition ? "Mamacita calcule..." : "🔥 Estimer la nutrition"}
+            </button>
+          )}
         </div>
+        {nutritionError && <p className="form-error">{nutritionError}</p>}
+        {nutrition && (
+          <p className="book-page__nutrition-detail">
+            Par portion, estimation : {nutrition.calories} kcal · {nutrition.protein_g} g protéines ·{" "}
+            {nutrition.carbs_g} g glucides · {nutrition.fat_g} g lipides
+          </p>
+        )}
         {missing && missing.length > 0 && (
           <div className="book-page__missing">
             <p>

@@ -120,6 +120,25 @@
   opacity: 0.5;
   cursor: default;
 }
+.toc-page__favorite {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.05rem;
+  color: var(--color-ink-soft);
+  padding: 4px 4px;
+}
+.toc-page__favorite:hover {
+  color: var(--color-autumn-orange);
+}
+.toc-page__favorite--active {
+  color: var(--color-autumn-orange);
+}
+.toc-page__favorite:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .toc-page__item:hover {
   background: var(--color-cream);
 }

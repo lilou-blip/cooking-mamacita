@@ -104,6 +104,15 @@
   color: var(--color-ink);
 }
 
+.stats__nutrition-avg {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-ink);
+}
+.stats__nutrition-avg strong {
+  color: var(--color-groseille-deep);
+}
+
 .stats__waste-count {
   font-family: var(--font-body);
   font-size: 0.92rem;

@@ -11,6 +11,7 @@ import {
   listRecipesWithTags,
   listStorageUnits,
   markRecipeMade,
+  toggleRecipeFavorite,
   type Profile,
   type RecipeCard,
   type RecipeFull,
@@ -52,13 +53,24 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-interface AppProps {
-  onLogout: () => void;
+export interface SharedImportPayload {
+  url?: string;
+  text?: string;
 }
 
-function App({ onLogout }: AppProps) {
-  const [section, setSection] = useState<Section>("table");
-  const [view, setView] = useState<View>("toc");
+interface AppProps {
+  onLogout: () => void;
+  initialSharedImport?: SharedImportPayload | null;
+}
+
+function App({ onLogout, initialSharedImport }: AppProps) {
+  // Arrivée via le partage natif (voir main.tsx) : on ouvre directement l'import plutôt que la table,
+  // pour ne pas faire chercher le bouton "Importer" à quelqu'un qui vient de partager une recette.
+  // Gardé en état local (et pas juste lu depuis la prop) pour pouvoir l'effacer une fois consommé : sinon
+  // rouvrir "Importer avec Mamacita" plus tard depuis le sommaire préremplirait à nouveau avec ce même partage.
+  const [section, setSection] = useState<Section>(initialSharedImport ? "carnet" : "table");
+  const [view, setView] = useState<View>(initialSharedImport ? "import" : "toc");
+  const [pendingSharedImport, setPendingSharedImport] = useState(initialSharedImport ?? null);
   const [recipes, setRecipes] = useState<RecipeCard[]>([]);
   const [selectedTocId, setSelectedTocId] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -211,6 +223,15 @@ function App({ onLogout }: AppProps) {
     setView("form");
   }
 
+  async function handleToggleFavorite(id: number, isFavorite: boolean) {
+    try {
+      await toggleRecipeFavorite(id, isFavorite);
+      await refreshRecipes();
+    } catch (err) {
+      console.error("Échec du changement de favori :", err);
+    }
+  }
+
   /** Duplique puis ouvre directement la copie en édition (renommer/adapter la variante tout de suite,
    * plutôt que de d'abord l'ouvrir en lecture comme après une création classique). */
   async function handleDuplicate(id: number) {
@@ -227,6 +248,7 @@ function App({ onLogout }: AppProps) {
   }
 
   function handleImportClick() {
+    setPendingSharedImport(null);
     setView("import");
   }
 
@@ -320,7 +342,14 @@ function App({ onLogout }: AppProps) {
 
   function renderCarnet() {
     if (view === "import") {
-      return <ImportRecipe onDrafted={handleDrafted} onCancel={() => setView("toc")} />;
+      return (
+        <ImportRecipe
+          onDrafted={handleDrafted}
+          onCancel={() => setView("toc")}
+          initialUrl={pendingSharedImport?.url}
+          initialText={pendingSharedImport?.text}
+        />
+      );
     }
 
     if (view === "form") {
@@ -377,6 +406,7 @@ function App({ onLogout }: AppProps) {
               onAddNew={handleAddNew}
               onImport={handleImportClick}
               onDuplicate={handleDuplicate}
+              onToggleFavorite={handleToggleFavorite}
             />
           </div>
         </div>
@@ -422,6 +452,7 @@ function App({ onLogout }: AppProps) {
               onAddNew={handleAddNew}
               onImport={handleImportClick}
               onDuplicate={handleDuplicate}
+              onToggleFavorite={handleToggleFavorite}
             />
           }
           right={<RecipePreviewPage recipe={selectedTocRecipe} onOpen={() => openFromToc()} />}

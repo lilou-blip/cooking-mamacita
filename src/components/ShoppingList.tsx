@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   addShoppingListItem,
   createPantryItem,
@@ -13,6 +13,7 @@ import {
   type Unit,
 } from "../lib/db";
 import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/assistant";
+import { INGREDIENT_CATEGORIES } from "../lib/constants";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import { LoadingScreen } from "./LoadingScreen";
@@ -247,6 +248,13 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   const total = list.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   const missingPriceCount = list.items.filter((i) => i.price == null).length;
+  // Groupé par catégorie (dans l'ordre de INGREDIENT_CATEGORIES, qui suit à peu près les rayons d'un
+  // supermarché) plutôt qu'en une liste plate, pour ne pas zigzaguer entre les rayons pendant les courses.
+  const groupedItems = INGREDIENT_CATEGORIES.map((c) => ({
+    category: c.value,
+    label: c.label,
+    items: list.items.filter((item) => item.ingredient_category === c.value),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <div className="shopping-list">
@@ -272,87 +280,92 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
           <p className="shopping-list__empty">Tout est déjà dans le garde-manger, rien à acheter !</p>
         ) : (
           <ul className="shopping-list__items">
-            {list.items.map((item) => (
-              <li
-                key={item.id}
-                className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--expanded" : ""}`}
-              >
-                <div className="shopping-list__item-main">
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    onChange={(e) => toggleChecked(item.id, e.target.checked)}
-                    aria-label={`${item.ingredient_name} acheté`}
-                  />
-                  <span className="shopping-list__qty">
-                    {item.quantity != null
-                      ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
-                      : ""}
-                  </span>
-                  <span className="shopping-list__name">{item.ingredient_name}</span>
-                  {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
-                </div>
-                <div className="shopping-list__item-controls">
-                  {item.price == null && !estimatingAll && (
-                    <button
-                      type="button"
-                      className="shopping-list__estimate"
-                      onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
-                      disabled={estimatingId === item.id || estimatingAll}
-                    >
-                      {estimatingId === item.id ? "..." : "💡 Estimer"}
-                    </button>
-                  )}
-                  {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
-                  <input
-                    key={`${item.id}-${item.price ?? "empty"}`}
-                    className="shopping-list__price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="€"
-                    defaultValue={item.price ?? ""}
-                    onBlur={(e) => setPrice(item.id, e.target.value)}
-                    aria-label={`Prix de ${item.ingredient_name}`}
-                  />
-                  <button
-                    type="button"
-                    className="shopping-list__delete"
-                    onClick={() => handleDeleteItem(item.id)}
-                    aria-label="Retirer"
+            {groupedItems.map((group) => (
+              <Fragment key={group.category}>
+                <li className="shopping-list__category-header">{group.label}</li>
+                {group.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--expanded" : ""}`}
                   >
-                    ×
-                  </button>
-                </div>
-
-                {transferringId === item.id && (
-                  <div className="shopping-list__transfer">
-                    <span className="shopping-list__transfer-label">Ranger dans :</span>
-                    <input
-                      type="date"
-                      className="shopping-list__transfer-expiry"
-                      value={transferExpiry}
-                      onChange={(e) => setTransferExpiry(e.target.value)}
-                      title="Date de péremption (optionnel)"
-                    />
-                    {storageUnits.map((u) => (
-                      <button key={u.id} type="button" onClick={() => handleTransfer(item, u.id)}>
-                        {u.name}
+                    <div className="shopping-list__item-main">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) => toggleChecked(item.id, e.target.checked)}
+                        aria-label={`${item.ingredient_name} acheté`}
+                      />
+                      <span className="shopping-list__qty">
+                        {item.quantity != null
+                          ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
+                          : ""}
+                      </span>
+                      <span className="shopping-list__name">{item.ingredient_name}</span>
+                      {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
+                    </div>
+                    <div className="shopping-list__item-controls">
+                      {item.price == null && !estimatingAll && (
+                        <button
+                          type="button"
+                          className="shopping-list__estimate"
+                          onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
+                          disabled={estimatingId === item.id || estimatingAll}
+                        >
+                          {estimatingId === item.id ? "..." : "💡 Estimer"}
+                        </button>
+                      )}
+                      {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
+                      <input
+                        key={`${item.id}-${item.price ?? "empty"}`}
+                        className="shopping-list__price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="€"
+                        defaultValue={item.price ?? ""}
+                        onBlur={(e) => setPrice(item.id, e.target.value)}
+                        aria-label={`Prix de ${item.ingredient_name}`}
+                      />
+                      <button
+                        type="button"
+                        className="shopping-list__delete"
+                        onClick={() => handleDeleteItem(item.id)}
+                        aria-label="Retirer"
+                      >
+                        ×
                       </button>
-                    ))}
-                    <button type="button" onClick={() => handleTransfer(item, null)}>
-                      Sans emplacement
-                    </button>
-                    <button
-                      type="button"
-                      className="shopping-list__transfer-skip"
-                      onClick={() => setTransferringId(null)}
-                    >
-                      Plus tard
-                    </button>
-                  </div>
-                )}
-              </li>
+                    </div>
+
+                    {transferringId === item.id && (
+                      <div className="shopping-list__transfer">
+                        <span className="shopping-list__transfer-label">Ranger dans :</span>
+                        <input
+                          type="date"
+                          className="shopping-list__transfer-expiry"
+                          value={transferExpiry}
+                          onChange={(e) => setTransferExpiry(e.target.value)}
+                          title="Date de péremption (optionnel)"
+                        />
+                        {storageUnits.map((u) => (
+                          <button key={u.id} type="button" onClick={() => handleTransfer(item, u.id)}>
+                            {u.name}
+                          </button>
+                        ))}
+                        <button type="button" onClick={() => handleTransfer(item, null)}>
+                          Sans emplacement
+                        </button>
+                        <button
+                          type="button"
+                          className="shopping-list__transfer-skip"
+                          onClick={() => setTransferringId(null)}
+                        >
+                          Plus tard
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </Fragment>
             ))}
           </ul>
         )}

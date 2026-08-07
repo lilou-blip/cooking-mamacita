@@ -1,10 +1,14 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { fetchRecipeTextFromUrl, structureRecipeFromImage, structureRecipeFromText, type RecipeDraft } from "../lib/assistant";
 import "./ImportRecipe.css";
 
 interface ImportRecipeProps {
   onDrafted: (draft: RecipeDraft) => void;
   onCancel: () => void;
+  /** Préremplissage venu du partage natif (voir App.tsx / main.tsx) : une URL déclenche la récupération
+   * automatique du texte, comme si on avait cliqué "Récupérer le texte" soi-même. */
+  initialUrl?: string;
+  initialText?: string;
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -19,9 +23,9 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
-  const [text, setText] = useState("");
-  const [url, setUrl] = useState("");
+export function ImportRecipe({ onDrafted, onCancel, initialUrl, initialText }: ImportRecipeProps) {
+  const [text, setText] = useState(initialText ?? "");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [loading, setLoading] = useState(false);
   const [fetchingUrl, setFetchingUrl] = useState(false);
   const [scanningPhoto, setScanningPhoto] = useState(false);
@@ -55,6 +59,14 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
       setFetchingUrl(false);
     }
   }
+
+  // Arrivée avec une URL préremplie (partage natif) : lance la récupération tout de suite, comme si
+  // on avait cliqué "Récupérer le texte" — pas de raison de faire ce clic en plus soi-même. Différé en
+  // microtâche (plutôt qu'un appel direct) pour ne pas déclencher de setState synchrone en tête d'effet.
+  useEffect(() => {
+    if (initialUrl?.trim()) queueMicrotask(() => handleFetchUrl());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

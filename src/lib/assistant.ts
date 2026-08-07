@@ -1,6 +1,15 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import { listAllTags, listPantryItems, listRecipesWithTags, listUnits, type Tag, type TagCategory, type Unit } from "./db";
+import {
+  listAllTags,
+  listPantryItems,
+  listRecipesWithTags,
+  listUnits,
+  type NutritionEstimate,
+  type Tag,
+  type TagCategory,
+  type Unit,
+} from "./db";
 import { INGREDIENT_CATEGORIES, TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "./constants";
 
 /** Les erreurs d'Edge Function de supabase-js n'exposent qu'un message générique ("non-2xx status code") ;
@@ -270,6 +279,35 @@ Réponds UNIQUEMENT avec un objet JSON valide : {"low": nombre, "high": nombre}
   const high = typeof obj.high === "number" && obj.high >= low ? obj.high : low + 1;
 
   return { low, high };
+}
+
+/** Estimation nutritionnelle approximative d'une recette PAR PORTION (pas pour la recette entière) —
+ * à partir de la liste d'ingrédients à l'échelle de base (recipe.servings), pour que le résultat reste
+ * valable quel que soit le nombre de portions affiché ensuite sur la fiche. */
+export async function estimateNutrition(
+  recipeTitle: string,
+  servings: number,
+  ingredients: { name: string; quantity: number | null; unit: string | null }[],
+): Promise<NutritionEstimate> {
+  const systemPrompt = `Tu estimes la valeur nutritionnelle approximative d'une recette de cuisine familiale.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"calories": nombre, "protein_g": nombre, "carbs_g": nombre, "fat_g": nombre}
+Ces 4 valeurs sont PAR PORTION (divise le total de la recette par le nombre de portions indiqué), pas pour toute la recette. Sois cohérent : calories ≈ protein_g*4 + carbs_g*4 + fat_g*9 (à peu près). Donne des nombres entiers réalistes pour un plat familial, pas des valeurs extrêmes.`;
+
+  const ingredientsText = ingredients
+    .map((i) => `- ${i.quantity != null ? `${i.quantity}${i.unit ? " " + i.unit : ""} de ` : ""}${i.name}`)
+    .join("\n");
+  const userMessage = `Recette : ${recipeTitle} (${servings} portion(s) au total)\nIngrédients pour toute la recette :\n${ingredientsText}`;
+
+  const parsed = await callAiJson(systemPrompt, userMessage, 100);
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" && v >= 0 ? Math.round(v) : 0);
+
+  return {
+    calories: num(obj.calories),
+    protein_g: num(obj.protein_g),
+    carbs_g: num(obj.carbs_g),
+    fat_g: num(obj.fat_g),
+  };
 }
 
 export const PRICE_COMPARISON_RETAILERS = ["Carrefour", "E.Leclerc", "Auchan", "Intermarché", "Lidl", "Aldi"] as const;
