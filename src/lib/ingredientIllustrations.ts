@@ -22,6 +22,14 @@ for (const path in modules) {
 
 const FILLER_WORDS = new Set(["de", "du", "des", "d", "la", "le", "les", "au", "aux", "en", "a", "et", "un", "une"]);
 
+/**
+ * Paires (mot supplémentaire présent dans l'ingrédient -> slug d'illustration à exclure) pour les faux-amis :
+ * des noms composés qui contiennent le mot d'une illustration existante mais désignent un aliment totalement
+ * différent (ex: "pomme de terre" contient "pomme" mais n'a rien à voir avec une pomme). Sans entrée dédiée pour
+ * le composé, mieux vaut n'afficher aucune illustration qu'une illustration trompeuse.
+ */
+const FALSE_FRIEND_BLOCKLIST: [extraWord: string, blockedSlug: string][] = [["terre", "pomme"]];
+
 /** Mots significatifs d'un slug, sans les mots de liaison, avec un pluriel simple retiré ("pepites" -> "pepite"). */
 function coreWords(slug: string): string[] {
   return slug
@@ -43,9 +51,14 @@ export function getIngredientIllustration(name: string): string | undefined {
   if (exact) return exact;
 
   const ingredientWords = coreWords(slug);
+  const blockedSlugs = new Set(
+    FALSE_FRIEND_BLOCKLIST.filter(([extraWord]) => ingredientWords.includes(extraWord)).map(([, blocked]) => blocked),
+  );
+
   let bestScore = 0;
   let bestSrc: string | undefined;
   for (const [key, src] of illustrationsBySlug) {
+    if (blockedSlugs.has(key)) continue;
     const keyWords = coreWords(key);
     if (keyWords.length > bestScore && keyWords.every((w) => ingredientWords.includes(w))) {
       bestScore = keyWords.length;
