@@ -30,6 +30,12 @@
   position: relative;
   z-index: 1;
 }
+/* Quand la rangée de boutons (Éditer/Partager/Supprimer) est assez large, elle peut s'étendre jusque sous
+   l'épingle décorative centrée au-dessus du titre — on pousse le titre plus bas pour ne jamais s'en approcher,
+   plutôt que d'ajuster la largeur de la rangée à la main (fragile si un bouton est ajouté/retiré plus tard). */
+.book-page__page-actions + .book-page__header {
+  margin-top: 38px;
+}
 
 .book-page__title-tag {
   display: inline-block;
