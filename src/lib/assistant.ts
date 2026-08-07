@@ -74,6 +74,11 @@ Réponds UNIQUEMENT avec un objet JSON valide (pas de texte avant/après, pas de
   "steps": [string, ...]
 }
 
+Si le texte décrit PLUSIEURS recettes distinctes (ex: un plat principal présenté avec un accompagnement ou
+une sauce qui a ses propres ingrédients et étapes, "sert bien avec X"...), structure UNIQUEMENT la recette
+principale (celle qui donne son nom/titre au post, généralement la première décrite) — n'essaie pas de
+combiner plusieurs recettes en une seule, ignore les ingrédients/étapes de l'accompagnement secondaire.
+
 Tags — utilise uniquement ces valeurs exactes de "category" et "name" (n'en invente pas d'autres) :
 ${tagsByCategory}
 Choisis TOUJOURS au moins un tag de la catégorie "type" (entrée/plat/dessert/apéritif/boisson) qui correspond à la recette, plus les autres tags pertinents qui sont évidents (régime, goût, saison, température). Ne laisse jamais "tags" vide.

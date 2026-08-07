@@ -83,6 +83,23 @@ function decodeEntities(s: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
+/** Certains réseaux sociaux (Instagram...) répètent l'intégralité de la légende dans og:title ET
+ * og:description, juste avec un préfixe différent ("Auteur sur Instagram: ..." vs "N mentions J'aime,
+ * M commentaires - auteur le DATE: ..."), doublant inutilement le texte envoyé à l'IA. Si l'un des deux
+ * textes se termine par le même passage que l'autre, ils décrivent la même légende : garder seulement le
+ * plus long (qui contient déjà tout). Sur un site classique (non social), title/description ne se
+ * recoupent pas ainsi et restent concaténés normalement. */
+function dedupeOgText(title: string, description: string): string {
+  if (!title) return description;
+  if (!description) return title;
+
+  const [shortText, longText] = title.length <= description.length ? [title, description] : [description, title];
+  const shortTail = shortText.slice(-100).trim();
+  if (shortTail.length > 20 && longText.includes(shortTail)) return longText;
+
+  return [title, description].join("\n\n");
+}
+
 function normalizeWhitespace(s: string): string {
   let out = "";
   let lastChar: string | null = null;
@@ -152,9 +169,9 @@ Deno.serve(async (req) => {
     // Posts de réseaux sociaux (Instagram, TikTok, Facebook...) : ce sont des pages très majoritairement en JS,
     // le HTML brut ne contient quasiment que les balises <meta> Open Graph, avec la légende (souvent la recette)
     // dans og:description. On les priorise avant le nettoyage générique, qui ne donnerait que du bruit d'appli JS.
-    const ogTitle = extractMetaContent(html, "og:title");
-    const ogDescription = extractMetaContent(html, "og:description");
-    const ogText = normalizeWhitespace(decodeEntities([ogTitle, ogDescription].filter(Boolean).join("\n\n")));
+    const ogTitle = extractMetaContent(html, "og:title") ?? "";
+    const ogDescription = extractMetaContent(html, "og:description") ?? "";
+    const ogText = normalizeWhitespace(decodeEntities(dedupeOgText(ogTitle, ogDescription)));
 
     const truncated =
       ogText.length > 0

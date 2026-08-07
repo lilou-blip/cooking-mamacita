@@ -1390,10 +1390,12 @@ async function getGuestProfileIds(): Promise<Set<number>> {
   return new Set((await listProfiles()).filter((p) => p.is_guest).map((p) => p.id));
 }
 
-/** Repas (consumption_log) attribués UNIQUEMENT à un ou plusieurs profils invités — à exclure de la vue
- * "Tous" (partagé avec au moins une personne du foyer, un repas reste compté normalement). */
-async function getGuestOnlyLogIds(guestProfileIds: Set<number>): Promise<Set<number>> {
-  if (guestProfileIds.size === 0) return new Set();
+/** Repas (consumption_log) à exclure de la vue "Tous" : attribués uniquement à un/des profil(s) invité(s),
+ * OU pas attribués à un profil du tout. On ne présume plus qu'un repas sans profil renseigné est un repas
+ * du foyer par défaut — ça créait de la confusion ("l'invité compte encore dans Tous") quand un repas fait
+ * pour l'invité n'avait en fait jamais été explicitement attribué. Sélectionner directement un profil
+ * (y compris invité) montre quand même ses propres données, exclues ou non de "Tous". */
+async function getExcludedFromHouseholdLogIds(allLogIds: number[], guestProfileIds: Set<number>): Promise<Set<number>> {
   const attributions = unwrap<{ consumption_log_id: number; profile_id: number }[]>(
     await supabase.from("consumption_log_profiles").select("consumption_log_id, profile_id"),
   );
@@ -1404,28 +1406,29 @@ async function getGuestOnlyLogIds(guestProfileIds: Set<number>): Promise<Set<num
     profilesByLog.set(a.consumption_log_id, list);
   }
   const excluded = new Set<number>();
-  for (const [logId, profIds] of profilesByLog.entries()) {
-    if (profIds.length > 0 && profIds.every((p) => guestProfileIds.has(p))) excluded.add(logId);
+  for (const logId of allLogIds) {
+    const profIds = profilesByLog.get(logId);
+    if (!profIds || profIds.length === 0 || profIds.every((p) => guestProfileIds.has(p))) excluded.add(logId);
   }
   return excluded;
 }
 
 export async function getTopMadeRecipes(limit = 5, profileId?: number | null): Promise<TopRecipeStat[]> {
   let logIds: number[] | null = null;
-  let excludedLogIds = new Set<number>();
   if (profileId != null) {
-    const rows = unwrap<{ consumption_log_id: number }[]>(
+    const attributed = unwrap<{ consumption_log_id: number }[]>(
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
-    logIds = rows.map((r) => r.consumption_log_id);
+    logIds = attributed.map((r) => r.consumption_log_id);
     if (logIds.length === 0) return [];
-  } else {
-    excludedLogIds = await getGuestOnlyLogIds(await getGuestProfileIds());
   }
 
   let query = supabase.from("consumption_log").select("id, recipe_id, recipes(title)");
   if (logIds) query = query.in("id", logIds);
   const rows = unwrap<{ id: number; recipe_id: number; recipes: { title: string } | null }[]>(await (query as never));
+
+  const excludedLogIds =
+    profileId == null ? await getExcludedFromHouseholdLogIds(rows.map((r) => r.id), await getGuestProfileIds()) : new Set<number>();
 
   const counts = new Map<number, { title: string; count: number }>();
   for (const row of rows) {
@@ -1453,15 +1456,12 @@ export interface NutritionSummary {
  * couverture réelle (ex: "estimé sur 3 des 8 fois où tu as cuisiné"). */
 export async function getAverageNutrition(profileId?: number | null): Promise<NutritionSummary | null> {
   let logIds: number[] | null = null;
-  let excludedLogIds = new Set<number>();
   if (profileId != null) {
-    const rows = unwrap<{ consumption_log_id: number }[]>(
+    const attributed = unwrap<{ consumption_log_id: number }[]>(
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
-    logIds = rows.map((r) => r.consumption_log_id);
+    logIds = attributed.map((r) => r.consumption_log_id);
     if (logIds.length === 0) return null;
-  } else {
-    excludedLogIds = await getGuestOnlyLogIds(await getGuestProfileIds());
   }
 
   let query = supabase.from("consumption_log").select("id, recipe_id, recipes(nutrition_estimate)");
@@ -1469,6 +1469,9 @@ export async function getAverageNutrition(profileId?: number | null): Promise<Nu
   const rows = unwrap<{ id: number; recipe_id: number; recipes: { nutrition_estimate: NutritionEstimate | null } | null }[]>(
     await (query as never),
   );
+
+  const excludedLogIds =
+    profileId == null ? await getExcludedFromHouseholdLogIds(rows.map((r) => r.id), await getGuestProfileIds()) : new Set<number>();
 
   let totalMade = 0;
   let sumCalories = 0;
@@ -1529,8 +1532,10 @@ async function loadRecipeIngredientProfiles(
  * — 10g de beurre ne doit pas peser autant que 1kg dans les stats.
  *
  * Quand profileId est omis (vue "Tous"), les consommations attribuées UNIQUEMENT à un profil marqué
- * "invité" sont exclues : ce profil sert de fourre-tout pour les repas avec des invités et ne doit pas
- * gonfler les stats du foyer. Sélectionner directement le profil invité, lui, montre bien ses données.
+ * "invité", ou pas attribuées à un profil du tout, sont exclues (voir getExcludedFromHouseholdLogIds) —
+ * ce profil sert de fourre-tout pour les repas avec des invités et ne doit pas gonfler les stats du foyer,
+ * et un repas sans profil renseigné n'est plus présumé être un repas du foyer par défaut. Sélectionner
+ * directement le profil invité, lui, montre bien ses données.
  */
 export async function getConsumptionByCategory(profileId?: number | null): Promise<CategoryStat[]> {
   const { unitTypeOf, toBase } = createUnitConverter(await listUnits());
@@ -1556,7 +1561,7 @@ export async function getConsumptionByCategory(profileId?: number | null): Promi
   const dishRows = pantryRows.filter((r) => r.recipe_id != null);
 
   for (const row of directRows) {
-    if (profileId == null && row.profile_id != null && guestProfileIds.has(row.profile_id)) continue;
+    if (profileId == null && (row.profile_id == null || guestProfileIds.has(row.profile_id))) continue;
     if (row.ingredients) add(row.ingredients.category, row.quantity, row.unit_id);
   }
 
@@ -1566,7 +1571,7 @@ export async function getConsumptionByCategory(profileId?: number | null): Promi
     const dishRecipeIds = [...new Set(dishRows.map((r) => r.recipe_id!))];
     const profiles = await loadRecipeIngredientProfiles(dishRecipeIds);
     for (const row of dishRows) {
-      if (profileId == null && row.profile_id != null && guestProfileIds.has(row.profile_id)) continue;
+      if (profileId == null && (row.profile_id == null || guestProfileIds.has(row.profile_id))) continue;
       const profile = profiles.get(row.recipe_id!);
       if (!profile || profile.baseServings <= 0) continue;
       const scale = row.quantity / profile.baseServings;
@@ -1579,19 +1584,18 @@ export async function getConsumptionByCategory(profileId?: number | null): Promi
 
   // --- Recettes marquées "faites" ---
   let logIds: number[] | null = null;
-  let excludedLogIds = new Set<number>();
   if (profileId != null) {
-    const rows = unwrap<{ consumption_log_id: number }[]>(
+    const attributed = unwrap<{ consumption_log_id: number }[]>(
       await supabase.from("consumption_log_profiles").select("consumption_log_id").eq("profile_id", profileId),
     );
-    logIds = rows.map((r) => r.consumption_log_id);
-  } else {
-    excludedLogIds = await getGuestOnlyLogIds(guestProfileIds);
+    logIds = attributed.map((r) => r.consumption_log_id);
   }
 
   let logQuery = supabase.from("consumption_log").select("id, recipe_id, servings");
   if (logIds) logQuery = logQuery.in("id", logIds);
   const logRowsRaw = unwrap<{ id: number; recipe_id: number; servings: number }[]>(await logQuery);
+  const excludedLogIds =
+    profileId == null ? await getExcludedFromHouseholdLogIds(logRowsRaw.map((r) => r.id), guestProfileIds) : new Set<number>();
   const logRows = logRowsRaw.filter((r) => !excludedLogIds.has(r.id));
 
   if (logRows.length > 0) {
@@ -1621,7 +1625,7 @@ export interface ProfileStat {
 }
 
 /** Vue "Tous" uniquement (pas de paramètre profileId : cette section n'est affichée que là) — un profil
- * invité ne doit donc jamais y apparaître, cf. getGuestOnlyLogIds. */
+ * invité ne doit donc jamais y apparaître, cf. getExcludedFromHouseholdLogIds. */
 export async function getConsumptionByProfile(): Promise<ProfileStat[]> {
   const [pantryRows, logProfileRows, profiles] = await Promise.all([
     supabase
