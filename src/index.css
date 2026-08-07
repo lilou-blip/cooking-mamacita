@@ -13,10 +13,19 @@ body {
   overscroll-behavior-x: contain;
   font-family: var(--font-body);
   color: var(--color-ink);
+  /* Le premier calque est un léger grain "papier aquarelle" (bruit SVG, alpha ~5% baké dans l'image elle-
+     même) plutôt qu'un fond blanc froid et lisse — pour une sensation plus artisanale, à peine perceptible. */
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.15 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")
+      repeat,
     radial-gradient(circle at 18% 15%, rgba(244, 194, 194, 0.35), transparent 55%),
     radial-gradient(circle at 82% 0%, rgba(217, 125, 61, 0.18), transparent 50%),
     var(--color-cream-deep);
+  background-size:
+    200px 200px,
+    auto,
+    auto,
+    auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

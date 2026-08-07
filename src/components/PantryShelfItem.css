@@ -127,16 +127,44 @@
   width: 240px;
 }
 
+/* Étiquette "masking tape" plutôt qu'une pilule plate : bande semi-transparente légèrement inclinée, bords
+   flous façon adhésif déchiré, texte à la police manuscrite déjà utilisée pour les titres. */
 .pantry-shelf-item__expiry {
-  font-size: 0.78rem;
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-title);
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--color-ink-soft);
+  color: var(--color-ink);
+  background: linear-gradient(100deg, rgba(244, 194, 194, 0.55), rgba(244, 194, 194, 0.4));
+  padding: 3px 14px;
+  margin: 2px 3px;
+  transform: rotate(-1.5deg);
+  box-shadow: 1px 2px 4px rgba(74, 59, 50, 0.18);
+}
+.pantry-shelf-item__expiry::before,
+.pantry-shelf-item__expiry::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: inherit;
+  filter: blur(1.5px);
+}
+.pantry-shelf-item__expiry::before {
+  left: -3px;
+}
+.pantry-shelf-item__expiry::after {
+  right: -3px;
 }
 .pantry-shelf-item__expiry--soon {
-  color: var(--color-autumn-orange);
+  background: linear-gradient(100deg, rgba(217, 125, 61, 0.4), rgba(217, 125, 61, 0.28));
+  color: var(--color-brown);
 }
 .pantry-shelf-item__expiry--expired {
-  color: var(--color-groseille);
+  background: linear-gradient(100deg, rgba(192, 57, 43, 0.32), rgba(192, 57, 43, 0.22));
+  color: var(--color-groseille-deep);
 }
 
 .pantry-shelf-item__consume-form {

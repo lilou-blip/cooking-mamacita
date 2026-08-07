@@ -79,6 +79,44 @@
   pointer-events: none;
 }
 
+/* Onglets papier découpé façon carnet d'intercalaires vintage : celui qui n'est pas actif reste légèrement
+   en retrait (top décalé), l'onglet actif remonte au premier plan avec une ombre plus marquée. */
+.pantry-themed__tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 16px;
+}
+.pantry-themed__tab {
+  position: relative;
+  top: 4px;
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-brown);
+  background: var(--color-cream-deep);
+  border: none;
+  border-radius: 10px 10px 0 0;
+  padding: 8px 20px 10px;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(74, 59, 50, 0.22);
+  transition: top 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.pantry-themed__tab:hover {
+  top: 1px;
+  background: var(--color-blush);
+}
+.pantry-themed__tab--active {
+  top: 0;
+  background: var(--color-white);
+  color: var(--color-groseille-deep);
+  box-shadow: 0 4px 10px rgba(74, 59, 50, 0.3);
+  z-index: 2;
+}
+
 .pantry-themed__shelf {
   display: flex;
   flex-wrap: wrap;
