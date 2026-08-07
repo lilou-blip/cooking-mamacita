@@ -61,7 +61,7 @@ function buildSystemPrompt(tags: Tag[], units: Unit[]): string {
   const unitList = units.map((u) => u.abbreviation).join(", ");
   const categoryList = INGREDIENT_CATEGORIES.map((c) => c.value).join(", ");
 
-  return `Tu structures des recettes de cuisine à partir d'un texte libre en français.
+  return `Tu structures des recettes de cuisine à partir d'un texte libre, dans n'importe quelle langue source.
 Réponds UNIQUEMENT avec un objet JSON valide (pas de texte avant/après, pas de balises markdown), respectant exactement ce schéma :
 {
   "title": string,
@@ -78,6 +78,17 @@ Si le texte décrit PLUSIEURS recettes distinctes (ex: un plat principal présen
 une sauce qui a ses propres ingrédients et étapes, "sert bien avec X"...), structure UNIQUEMENT la recette
 principale (celle qui donne son nom/titre au post, généralement la première décrite) — n'essaie pas de
 combiner plusieurs recettes en une seule, ignore les ingrédients/étapes de l'accompagnement secondaire.
+
+Langue et unités — quelle que soit la langue ou les unités du texte source :
+- Traduis TOUJOURS en français : titre, notes et étapes doivent être rédigés en français, jamais laissés
+  dans la langue d'origine (anglais, etc.), même partiellement.
+- Convertis TOUJOURS les quantités vers le système métrique utilisé ici (grammes/kg, ml/cl/l, cuillère à
+  café/cuillère à soupe, pincée, pièce) — ne renvoie jamais une quantité en tasses ("cup"), onces ("oz"),
+  livres ("lb"/"pound"), ou une unité anglaise abrégée ("tbsp", "tsp") : convertis-la avec une équivalence
+  culinaire réaliste plutôt que de laisser l'unité d'origine ou de mettre quantity à null (ex: 1 cup de
+  farine ≈ 125g, 1 cup de liquide ≈ 240ml, 1 tbsp ≈ 1 c. à s., 1 tsp ≈ 1 c. à c., 1 oz ≈ 28g, 1 lb ≈ 450g).
+- Dans le texte des étapes, convertis aussi les températures Fahrenheit en Celsius (ex: 350°F devient
+  environ 175°C) et toute autre mesure impériale mentionnée (pouces, livres...) en unité métrique.
 
 Tags — utilise uniquement ces valeurs exactes de "category" et "name" (n'en invente pas d'autres) :
 ${tagsByCategory}
