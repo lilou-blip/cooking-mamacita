@@ -1,66 +1,45 @@
-import { useEffect, useState } from "react";
+import { useTimers } from "../lib/TimerContext";
 import { formatTimer } from "../lib/stepTimer";
-import { showNotification } from "../lib/notifications";
 import "./StepTimer.css";
 
 interface StepTimerProps {
+  id: string;
+  label: string;
   seconds: number;
 }
 
-export function StepTimer({ seconds: initialSeconds }: StepTimerProps) {
-  const [remaining, setRemaining] = useState(initialSeconds);
-  const [running, setRunning] = useState(false);
-  const [done, setDone] = useState(false);
+export function StepTimer({ id, label, seconds }: StepTimerProps) {
+  const { getTimer, startTimer, toggleRunning, resetTimer } = useTimers();
+  const timer = getTimer(id);
 
-  useEffect(() => {
-    if (!running || remaining <= 0 || done) return;
-    const id = setTimeout(() => {
-      setRemaining((r) => {
-        const next = Math.max(0, r - 1);
-        if (next === 0) {
-          setDone(true);
-          void showNotification("Minuteur terminé ⏱", { body: "C'est prêt !", tag: "step-timer" });
-        }
-        return next;
-      });
-    }, 1000);
-    return () => clearTimeout(id);
-  }, [running, remaining, done]);
-
-  function reset() {
-    setRunning(false);
-    setDone(false);
-    setRemaining(initialSeconds);
+  if (!timer) {
+    return (
+      <button type="button" className="step-timer step-timer--start" onClick={() => startTimer(id, label, seconds)}>
+        ⏱ {formatTimer(seconds)}
+      </button>
+    );
   }
 
-  if (done) {
+  if (timer.done) {
     return (
       <div className="step-timer step-timer--done">
         <span>✅ Terminé !</span>
-        <button type="button" onClick={reset} aria-label="Relancer le minuteur">
+        <button type="button" onClick={() => resetTimer(id)} aria-label="Relancer le minuteur">
           ↺
         </button>
       </div>
     );
   }
 
-  if (running || remaining !== initialSeconds) {
-    return (
-      <div className="step-timer step-timer--active">
-        <span className="step-timer__clock">{formatTimer(remaining)}</span>
-        <button type="button" onClick={() => setRunning((r) => !r)} aria-label={running ? "Pause" : "Reprendre"}>
-          {running ? "⏸" : "▶"}
-        </button>
-        <button type="button" onClick={reset} aria-label="Réinitialiser le minuteur">
-          ×
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <button type="button" className="step-timer step-timer--start" onClick={() => setRunning(true)}>
-      ⏱ {formatTimer(initialSeconds)}
-    </button>
+    <div className="step-timer step-timer--active">
+      <span className="step-timer__clock">{formatTimer(timer.remainingSeconds)}</span>
+      <button type="button" onClick={() => toggleRunning(id)} aria-label={timer.running ? "Pause" : "Reprendre"}>
+        {timer.running ? "⏸" : "▶"}
+      </button>
+      <button type="button" onClick={() => resetTimer(id)} aria-label="Réinitialiser le minuteur">
+        ×
+      </button>
+    </div>
   );
 }

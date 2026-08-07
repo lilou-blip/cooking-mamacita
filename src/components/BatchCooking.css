@@ -216,6 +216,10 @@
   flex: 1;
 }
 
+.batch-cooking__entry-links {
+  display: flex;
+  gap: 16px;
+}
 .batch-cooking__entry-toggle {
   display: block;
   background: none;
@@ -333,6 +337,19 @@
 .batch-cooking__ingredient-qty {
   color: var(--color-ink-soft);
   white-space: nowrap;
+}
+
+.batch-cooking__ingredient-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.batch-cooking__batch-cost {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--color-groseille-deep);
 }
 
 .batch-cooking__plan {

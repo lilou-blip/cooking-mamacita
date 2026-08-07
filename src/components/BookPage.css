@@ -276,14 +276,32 @@
   min-width: 60px;
 }
 
+.book-page__steps-header {
+  text-align: center;
+  margin: 0 0 18px;
+}
 .book-page__steps-title {
   font-family: var(--font-title);
   font-size: 1.8rem;
   color: var(--color-groseille-deep);
   text-align: center;
-  margin: 0 0 18px;
+  margin: 0 0 8px;
   position: relative;
   z-index: 1;
+}
+.book-page__cook-mode-btn {
+  background: var(--color-groseille);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-tag);
+  padding: 8px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+}
+.book-page__cook-mode-btn:hover {
+  background: var(--color-groseille-deep);
 }
 
 .book-page__steps {

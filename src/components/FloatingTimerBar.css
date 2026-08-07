@@ -1,0 +1,52 @@
+.floating-timers {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 900;
+  display: flex;
+  gap: 8px;
+  max-width: min(70vw, 420px);
+  overflow-x: auto;
+  padding: 4px;
+}
+
+.floating-timers__item {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-white);
+  border: 1.5px solid var(--color-groseille-deep);
+  border-radius: var(--radius-tag);
+  padding: 6px 10px;
+  box-shadow: var(--shadow-card);
+  font-size: 0.8rem;
+}
+.floating-timers__item--done {
+  border-color: var(--color-autumn-orange);
+  background: var(--color-blush);
+}
+
+.floating-timers__label {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-soft);
+}
+
+.floating-timers__clock {
+  font-weight: 800;
+  color: var(--color-groseille-deep);
+  white-space: nowrap;
+}
+
+.floating-timers__item button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 2px 4px;
+  color: var(--color-groseille-deep);
+}

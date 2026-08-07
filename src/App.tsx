@@ -23,6 +23,8 @@ import { HomeTable } from "./components/HomeTable";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { AiAssistant } from "./components/AiAssistant";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { FloatingTimerBar } from "./components/FloatingTimerBar";
+import { TimerProvider } from "./lib/TimerContext";
 import type { RecipeDraft } from "./lib/assistant";
 import { checkAndNotify, notificationPermission, requestNotificationPermission } from "./lib/notifications";
 
@@ -491,7 +493,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
   }
 
   return (
-    <>
+    <TimerProvider>
       {section === "table" ? (
         <HomeTable
           onSelect={setSection}
@@ -526,6 +528,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
         section={section}
         currentRecipeTitle={section === "carnet" && view === "book" ? currentRecipe?.title : undefined}
       />
+      <FloatingTimerBar />
       {confirmingDelete && currentRecipe && (
         <ConfirmDialog
           message={`Supprimer "${currentRecipe.title}" ? Cette action est irréversible.`}
@@ -533,7 +536,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
           onCancel={() => setConfirmingDelete(false)}
         />
       )}
-    </>
+    </TimerProvider>
   );
 }
 

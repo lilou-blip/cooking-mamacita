@@ -1,8 +1,10 @@
 import { useState, type CSSProperties } from "react";
 import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
+  addShoppingListItem,
   createPantryItem,
   getMenuById,
+  getOrCreateStandaloneShoppingList,
   getRecipeById,
   listMenus,
   listProfiles,
@@ -17,9 +19,10 @@ import {
   type RecipeIngredientView,
   type StorageUnit,
 } from "../lib/db";
-import { suggestBatchCookingPlan, suggestBatchCookingSelection } from "../lib/assistant";
+import { estimatePriceRange, suggestBatchCookingPlan, suggestBatchCookingSelection } from "../lib/assistant";
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
 import { MEAL_SLOTS } from "../lib/constants";
+import { CookMode } from "./CookMode";
 import { LoadingScreen } from "./LoadingScreen";
 import "./PantryForm.css";
 import "./BatchCooking.css";
@@ -79,10 +82,16 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(null);
   const [recipeDetails, setRecipeDetails] = useState<Record<number, RecipeFull>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
+  const [cookModeRecipe, setCookModeRecipe] = useState<RecipeFull | null>(null);
 
   const [ingredientPreview, setIngredientPreview] = useState<BatchIngredientPreviewRow[] | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [batchCost, setBatchCost] = useState<{ low: number; high: number } | null>(null);
+  const [estimatingCost, setEstimatingCost] = useState(false);
+  const [addingMissingToList, setAddingMissingToList] = useState(false);
+  const [addedMissingToList, setAddedMissingToList] = useState(false);
+  const [missingListError, setMissingListError] = useState<string | null>(null);
 
   const [plan, setPlan] = useState<string[] | null>(null);
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
@@ -283,9 +292,16 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     await ensureRecipeDetail(recipeId);
   }
 
+  async function openCookMode(recipeId: number) {
+    const detail = await ensureRecipeDetail(recipeId);
+    if (detail) setCookModeRecipe(detail);
+  }
+
   async function handlePreviewIngredients() {
     setLoadingPreview(true);
     setPreviewError(null);
+    setBatchCost(null);
+    setMissingListError(null);
     try {
       const items = entries
         .map((e) => ({ recipeId: e.recipeId, servings: Number(e.totalQuantity) || 0 }))
@@ -296,6 +312,56 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
       setPreviewError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingPreview(false);
+    }
+  }
+
+  async function handleEstimateBatchCost() {
+    if (!ingredientPreview || ingredientPreview.length === 0) return;
+    setEstimatingCost(true);
+    try {
+      let low = 0;
+      let high = 0;
+      for (const row of ingredientPreview) {
+        const range = await estimatePriceRange(row.ingredient_name, row.quantity, row.unit_abbreviation);
+        low += range.low;
+        high += range.high;
+      }
+      setBatchCost({ low: Math.round(low * 100) / 100, high: Math.round(high * 100) / 100 });
+    } finally {
+      setEstimatingCost(false);
+    }
+  }
+
+  async function handleAddMissingToList() {
+    const missing = ingredientPreview?.filter((row) => !row.have_enough) ?? [];
+    if (missing.length === 0) return;
+    setAddingMissingToList(true);
+    setMissingListError(null);
+    try {
+      const listId = await getOrCreateStandaloneShoppingList();
+      // Chaque ingrédient est indépendant : si l'un échoue, les autres doivent quand même être ajoutés
+      // plutôt que de tout bloquer silencieusement (même logique que RecipeIngredientsPage).
+      const failures: string[] = [];
+      for (const row of missing) {
+        try {
+          await addShoppingListItem(listId, {
+            ingredient_name: row.ingredient_name,
+            quantity: row.missing_quantity,
+            unit_abbreviation: row.unit_abbreviation,
+          });
+        } catch (err) {
+          console.error(`Échec ajout "${row.ingredient_name}" à la liste de courses :`, err);
+          failures.push(row.ingredient_name);
+        }
+      }
+      if (failures.length > 0) {
+        setMissingListError(`Pas pu ajouter : ${failures.join(", ")}. Le reste a bien été ajouté.`);
+      } else {
+        setAddedMissingToList(true);
+        setTimeout(() => setAddedMissingToList(false), 2500);
+      }
+    } finally {
+      setAddingMissingToList(false);
     }
   }
 
@@ -542,13 +608,18 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      className="batch-cooking__entry-toggle"
-                      onClick={() => toggleExpand(entry.recipeId)}
-                    >
-                      {isExpanded ? "▾ Masquer la recette" : "▸ Voir ingrédients & étapes"}
-                    </button>
+                    <div className="batch-cooking__entry-links">
+                      <button
+                        type="button"
+                        className="batch-cooking__entry-toggle"
+                        onClick={() => toggleExpand(entry.recipeId)}
+                      >
+                        {isExpanded ? "▾ Masquer la recette" : "▸ Voir ingrédients & étapes"}
+                      </button>
+                      <button type="button" className="batch-cooking__entry-toggle" onClick={() => openCookMode(entry.recipeId)}>
+                        👩‍🍳 Mode cuisine
+                      </button>
+                    </div>
 
                     {isExpanded && (
                       <div className="batch-cooking__entry-detail">
@@ -658,6 +729,40 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                   )}
                 </ul>
               )}
+              {ingredientPreview && ingredientPreview.length > 0 && (
+                <div className="batch-cooking__ingredient-actions">
+                  {batchCost ? (
+                    <span className="batch-cooking__batch-cost">
+                      💰 ~{batchCost.low === batchCost.high ? `${batchCost.low}` : `${batchCost.low}-${batchCost.high}`}€ au
+                      total
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="form-cancel"
+                      onClick={handleEstimateBatchCost}
+                      disabled={estimatingCost}
+                    >
+                      {estimatingCost ? "Mamacita calcule..." : "💰 Estimer le coût du batch"}
+                    </button>
+                  )}
+                  {ingredientPreview.some((row) => !row.have_enough) && (
+                    <button
+                      type="button"
+                      className="form-cancel"
+                      onClick={handleAddMissingToList}
+                      disabled={addingMissingToList}
+                    >
+                      {addedMissingToList
+                        ? "Ajouté !"
+                        : addingMissingToList
+                          ? "Ajout..."
+                          : "🛒 Ajouter les ingrédients manquants à la liste"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {missingListError && <p className="form-error">{missingListError}</p>}
             </section>
 
             <section className="batch-cooking__optimize-block">
@@ -827,6 +932,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
           </>
         )}
       </div>
+      {cookModeRecipe && <CookMode recipe={cookModeRecipe} onClose={() => setCookModeRecipe(null)} />}
     </div>
   );
 }

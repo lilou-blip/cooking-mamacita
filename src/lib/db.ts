@@ -993,6 +993,7 @@ export interface BatchIngredientPreviewRow {
   quantity: number;
   unit_abbreviation: string | null;
   have_enough: boolean;
+  missing_quantity: number;
 }
 
 /** Ingrédients combinés nécessaires pour une séance de batch cooking (plusieurs recettes, chacune à un
@@ -1046,11 +1047,15 @@ export async function previewBatchIngredients(
   const result: BatchIngredientPreviewRow[] = [];
   for (const [key, entry] of needed.entries()) {
     const unit = entry.displayUnitId != null ? unitById.get(entry.displayUnitId) : undefined;
+    const haveBase = pantryBaseByKey.get(key) ?? 0;
+    const shortBase = Math.max(0, entry.baseQuantity - haveBase);
+    const shortDisplay = unit ? shortBase / unit.factor_to_base : shortBase;
     result.push({
       ingredient_name: entry.ingredientName,
       quantity: Math.round(entry.displayQuantity * 100) / 100,
       unit_abbreviation: unit?.abbreviation ?? null,
-      have_enough: (pantryBaseByKey.get(key) ?? 0) >= entry.baseQuantity,
+      have_enough: haveBase >= entry.baseQuantity,
+      missing_quantity: Math.round(shortDisplay * 100) / 100,
     });
   }
   return result.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));

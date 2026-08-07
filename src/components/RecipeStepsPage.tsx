@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { Profile, RecipeFull, StorageUnit } from "../lib/db";
 import { extractDurationSeconds } from "../lib/stepTimer";
+import { CookMode } from "./CookMode";
 import { SprigDoodle } from "./SprigDoodle";
 import { StepTimer } from "./StepTimer";
 import "./BookPage.css";
@@ -39,9 +41,16 @@ export function RecipeStepsPage({
   onConfirmMade,
   onCancelMadeForm,
 }: RecipeStepsPageProps) {
+  const [cookModeOpen, setCookModeOpen] = useState(false);
+
   return (
     <>
-      <h2 className="book-page__steps-title">Préparation</h2>
+      <div className="book-page__steps-header">
+        <h2 className="book-page__steps-title">Préparation</h2>
+        <button type="button" className="book-page__cook-mode-btn" onClick={() => setCookModeOpen(true)}>
+          👩‍🍳 Mode cuisine
+        </button>
+      </div>
 
       <ol className="book-page__steps">
         {recipe.steps.map((step) => {
@@ -51,7 +60,13 @@ export function RecipeStepsPage({
               <span className="step-card__number">{step.step_number}</span>
               <div>
                 <p>{step.instruction}</p>
-                {duration != null && <StepTimer seconds={duration} />}
+                {duration != null && (
+                  <StepTimer
+                    id={`step-${recipe.id}-${step.id}`}
+                    label={`${recipe.title} — étape ${step.step_number}`}
+                    seconds={duration}
+                  />
+                )}
               </div>
             </li>
           );
@@ -129,6 +144,8 @@ export function RecipeStepsPage({
       )}
 
       <SprigDoodle className="book-page__doodle book-page__doodle--br" flip />
+
+      {cookModeOpen && <CookMode recipe={recipe} onClose={() => setCookModeOpen(false)} />}
     </>
   );
 }
