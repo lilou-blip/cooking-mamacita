@@ -37,6 +37,7 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [missing, setMissing] = useState<MissingIngredient[] | null>(null);
   const [addingToList, setAddingToList] = useState(false);
   const [addedToList, setAddedToList] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,17 +52,30 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   async function handleAddMissingToList() {
     if (!missing || missing.length === 0) return;
     setAddingToList(true);
+    setListError(null);
     try {
       const listId = await getOrCreateStandaloneShoppingList();
+      // Chaque ingrédient est indépendant : si l'un échoue (ingrédient/unité introuvable, conflit...), les
+      // autres doivent quand même être ajoutés plutôt que de tout bloquer silencieusement.
+      const failures: string[] = [];
       for (const m of missing) {
-        await addShoppingListItem(listId, {
-          ingredient_name: m.ingredient_name,
-          quantity: m.quantity,
-          unit_abbreviation: m.unit_abbreviation,
-        });
+        try {
+          await addShoppingListItem(listId, {
+            ingredient_name: m.ingredient_name,
+            quantity: m.quantity,
+            unit_abbreviation: m.unit_abbreviation,
+          });
+        } catch (err) {
+          console.error(`Échec ajout "${m.ingredient_name}" à la liste de courses :`, err);
+          failures.push(m.ingredient_name);
+        }
       }
-      setAddedToList(true);
-      setTimeout(() => setAddedToList(false), 2500);
+      if (failures.length > 0) {
+        setListError(`Pas pu ajouter : ${failures.join(", ")}. Le reste a bien été ajouté.`);
+      } else {
+        setAddedToList(true);
+        setTimeout(() => setAddedToList(false), 2500);
+      }
     } finally {
       setAddingToList(false);
     }
@@ -198,6 +212,7 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
             >
               {addedToList ? "Ajouté !" : addingToList ? "Ajout..." : "🛒 Ajouter à la liste de courses"}
             </button>
+            {listError && <p className="book-page__missing-error">{listError}</p>}
           </div>
         )}
         <ul>
