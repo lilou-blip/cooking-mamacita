@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
   createPantryItem,
@@ -63,6 +63,8 @@ function formatIngredientLine(ing: RecipeIngredientView): string {
 export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [step, setStep] = useState<Step>("slots");
   const [selectedSlots, setSelectedSlots] = useState<Set<MealSlot>>(new Set());
+  const [selectedProfileIds, setSelectedProfileIds] = useState<Set<number>>(new Set());
+  const [manualHeadcount, setManualHeadcount] = useState("");
   const [weekMenuName, setWeekMenuName] = useState<string | null>(null);
   const [entries, setEntries] = useState<BatchEntry[]>([]);
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
@@ -101,6 +103,24 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
       else next.add(s);
       return next;
     });
+  }
+
+  function toggleProfile(id: number) {
+    setManualHeadcount("");
+    setSelectedProfileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Profils cochés ou nombre saisi à la main (mutuellement exclusifs) : sert de quantité par défaut
+  // quand aucun menu de la semaine ne fournit déjà une quantité planifiée pour la recette.
+  function getHeadcount(): number | null {
+    if (selectedProfileIds.size > 0) return selectedProfileIds.size;
+    const manual = Number(manualHeadcount);
+    return manual > 0 ? manual : null;
   }
 
   async function goToRecipes() {
@@ -145,15 +165,23 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   function addRecipe(recipeId: number) {
     const recipe = allRecipes.find((r) => r.id === recipeId);
     if (!recipe || entries.some((e) => e.recipeId === recipeId)) return;
+    const headcount = getHeadcount();
     setEntries((prev) => [
       ...prev,
-      { recipeId, title: recipe.title, suggestedTotal: null, totalQuantity: "", chunks: [makeChunk()] },
+      {
+        recipeId,
+        title: recipe.title,
+        suggestedTotal: null,
+        totalQuantity: headcount != null ? String(headcount) : "",
+        chunks: [makeChunk()],
+      },
     ]);
   }
 
   async function letAppChoose() {
     setChoosingForMe(true);
     try {
+      const headcount = getHeadcount();
       const top = await getTopMadeRecipes(8, null);
       let candidateIds = top.map((t) => t.recipe_id).filter((id) => !entries.some((e) => e.recipeId === id));
       if (candidateIds.length === 0) {
@@ -169,7 +197,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
           recipeId: r.id,
           title: r.title,
           suggestedTotal: null,
-          totalQuantity: String(r.servings),
+          totalQuantity: String(headcount ?? r.servings),
           chunks: [makeChunk()],
         })),
       ]);
@@ -335,6 +363,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
 
   const availableToAdd = allRecipes.filter((r) => !entries.some((e) => e.recipeId === r.id));
   const slotLabels = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value)).map((s) => s.label);
+  const headcount = getHeadcount();
   const backLabel =
     step === "slots" ? "← Garde-manger" : step === "recipes" ? "← Créneaux" : step === "plan" ? "← Recettes" : "← Plan";
 
@@ -365,6 +394,45 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                 </button>
               ))}
             </div>
+
+            <p className="batch-cooking__hint">
+              Pour qui ? Ça permet de pré-remplir automatiquement les quantités à cuisiner (une portion par
+              personne), plutôt que de les saisir à la main pour chaque recette.
+            </p>
+            {profiles.length > 0 && (
+              <div className="batch-cooking__slots">
+                {profiles.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`batch-cooking__slot batch-cooking__slot--profile${
+                      selectedProfileIds.has(p.id) ? " batch-cooking__slot--active" : ""
+                    }`}
+                    style={{ "--profile-color": p.color } as CSSProperties}
+                    onClick={() => toggleProfile(p.id)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="batch-cooking__headcount">
+              <label>
+                {profiles.length > 0 ? "ou juste un nombre de personnes :" : "Combien de personnes ?"}
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={manualHeadcount}
+                  onChange={(e) => {
+                    setManualHeadcount(e.target.value);
+                    if (e.target.value) setSelectedProfileIds(new Set());
+                  }}
+                  placeholder="ex : 4"
+                />
+              </label>
+            </div>
+
             <div className="batch-cooking__actions">
               <button type="button" className="form-cancel" onClick={onBack}>
                 Annuler
@@ -381,7 +449,9 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
             <p className="batch-cooking__hint">
               {weekMenuName
                 ? `Détecté depuis le menu "${weekMenuName}" (${slotLabels.join(" + ")}) — quantités calculées, ajustables si besoin.`
-                : `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — ajoute les recettes à préparer, ou laisse Mamacita choisir.`}
+                : headcount != null
+                  ? `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — quantités par défaut calculées pour ${headcount} personne${headcount > 1 ? "s" : ""}, ajustables si besoin.`
+                  : `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — ajoute les recettes à préparer, ou laisse Mamacita choisir.`}
             </p>
             {recipesError && <p className="form-error">{recipesError}</p>}
 

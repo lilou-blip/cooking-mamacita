@@ -74,6 +74,33 @@
   background: var(--color-groseille-deep);
 }
 
+.batch-cooking__slot--profile {
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.batch-cooking__slot--profile.batch-cooking__slot--active {
+  background: var(--profile-color, var(--color-groseille));
+  border-color: var(--profile-color, var(--color-groseille-deep));
+}
+
+.batch-cooking__headcount {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 20px;
+}
+.batch-cooking__headcount label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--color-ink-soft);
+}
+.batch-cooking__headcount input {
+  width: 70px;
+}
+
 .batch-cooking__entries {
   list-style: none;
   margin: 0 0 16px;
