@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
   addRecipeToMenu,
   deleteMenu,
@@ -38,7 +39,6 @@ export function Menus({ onBack }: MenusProps) {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [filter, setFilter] = useState<MenuFilter>("toutes");
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const [currentMenu, setCurrentMenu] = useState<MenuFull | null>(null);
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
@@ -59,12 +59,7 @@ export function Menus({ onBack }: MenusProps) {
     setWeekMenu(candidate ? await getMenuById(candidate.id) : null);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      await refreshMenus();
-      setLoading(false);
-    })();
-  }, [refreshMenus]);
+  const { loading, error: loadError } = useAsyncEffect(refreshMenus, [refreshMenus]);
 
   async function openMenu(id: number) {
     setError(null);
@@ -152,6 +147,7 @@ export function Menus({ onBack }: MenusProps) {
   }
 
   if (loading) return <LoadingScreen message="Chargement des menus..." />;
+  if (loadError) return <p className="status-text status-text--error">Erreur: {loadError}</p>;
 
   if (subView === "detail" && currentMenu) {
     const madeCount = currentMenu.recipes.filter((r) => r.made).length;

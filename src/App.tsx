@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import { useIsMobile } from "./lib/useIsMobile";
+import { useAsyncEffect } from "./lib/useAsyncEffect";
 import {
   countRecipeMade,
   createPantryItem,
@@ -64,8 +65,6 @@ function App({ onLogout }: AppProps) {
   const [currentRecipe, setCurrentRecipe] = useState<RecipeFull | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<RecipeFull | null>(null);
   const [importDraft, setImportDraft] = useState<RecipeDraft | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [justMade, setJustMade] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [madeCount, setMadeCount] = useState(0);
@@ -92,20 +91,12 @@ function App({ onLogout }: AppProps) {
     if (permission === "granted") checkAndNotify();
   }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        await ensureSeedRecipe();
-        await refreshRecipes();
-        setProfiles(await listProfiles());
-        setStorageUnits(await listStorageUnits());
-        if (notificationPermission() === "granted") checkAndNotify();
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const { loading, error } = useAsyncEffect(async () => {
+    await ensureSeedRecipe();
+    await refreshRecipes();
+    setProfiles(await listProfiles());
+    setStorageUnits(await listStorageUnits());
+    if (notificationPermission() === "granted") checkAndNotify();
   }, [refreshRecipes]);
 
   async function openRecipeAt(index: number) {

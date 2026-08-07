@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getSharedRecipe, type SharedRecipe, type SharedRecipeIngredient } from "../lib/sharedRecipe";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import { LoadingScreen } from "./LoadingScreen";
 import tableBackground from "../assets/illustrations/table-background.webp";
 import "./SharedRecipePage.css";
@@ -17,19 +18,8 @@ function formatQuantity(ing: SharedRecipeIngredient): string {
 
 export function SharedRecipePage({ token }: SharedRecipePageProps) {
   const [recipe, setRecipe] = useState<SharedRecipe | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setRecipe(await getSharedRecipe(token));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const { loading, error } = useAsyncEffect(async () => {
+    setRecipe(await getSharedRecipe(token));
   }, [token]);
 
   if (loading) return <LoadingScreen message="Ouverture de la recette..." />;

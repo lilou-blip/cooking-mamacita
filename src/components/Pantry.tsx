@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   adjustPantryItemQuantity,
   consumePantryItem,
@@ -10,6 +10,7 @@ import {
   type Profile,
   type StorageUnit,
 } from "../lib/db";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import { PantryForm } from "./PantryForm";
 import { PantryShelfItem } from "./PantryShelfItem";
 import { LoadingScreen } from "./LoadingScreen";
@@ -28,7 +29,6 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [storageUnits, setStorageUnits] = useState<StorageUnit[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [consumingId, setConsumingId] = useState<number | null>(null);
   const [consumeValue, setConsumeValue] = useState("");
   const [consumeProfileId, setConsumeProfileId] = useState("");
@@ -42,12 +42,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
     setStorageUnits(unitList);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      await refresh();
-      setLoading(false);
-    })();
-  }, [refresh]);
+  const { loading, error: loadError } = useAsyncEffect(refresh, [refresh]);
 
   async function confirmDelete() {
     if (!confirmingDelete) return;
@@ -87,6 +82,7 @@ export function Pantry({ onBack, initialUnitId, backgroundSrc, title }: PantryPr
   }
 
   if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
+  if (loadError) return <p className="status-text status-text--error">Erreur: {loadError}</p>;
 
   const visibleItems = items.filter((item) => initialUnitId === null || item.storage_unit_id === initialUnitId);
 

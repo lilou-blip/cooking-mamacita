@@ -54,13 +54,20 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   useEffect(() => {
     (async () => {
-      const [fresh, unitList, storageUnitList] = await Promise.all([refresh(), listUnits(), listStorageUnits()]);
-      setUnits(unitList);
-      setStorageUnits(storageUnitList);
-      setLoading(false);
-      if (!autoEstimated.current && fresh) {
-        autoEstimated.current = true;
-        await estimateMissing(fresh.items);
+      try {
+        const [fresh, unitList, storageUnitList] = await Promise.all([refresh(), listUnits(), listStorageUnits()]);
+        setUnits(unitList);
+        setStorageUnits(storageUnitList);
+        // Affiché dès que la liste elle-même est chargée : l'estimation des prix manquants tourne
+        // ensuite en tâche de fond (indicateur "estimatingAll" séparé), pas de raison de la faire attendre.
+        setLoading(false);
+        if (!autoEstimated.current && fresh) {
+          autoEstimated.current = true;
+          await estimateMissing(fresh.items);
+        }
+      } catch (err) {
+        setError(String(err));
+        setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

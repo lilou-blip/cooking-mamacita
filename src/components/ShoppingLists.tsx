@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   createShoppingList,
   deleteShoppingList,
@@ -6,6 +6,7 @@ import {
   renameShoppingList,
   type ShoppingListSummary,
 } from "../lib/db";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import { ShoppingList } from "./ShoppingList";
 import { LoadingScreen } from "./LoadingScreen";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -17,45 +18,55 @@ interface ShoppingListsProps {
 
 export function ShoppingLists({ onBack }: ShoppingListsProps) {
   const [lists, setLists] = useState<ShoppingListSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState<{ id: number; name: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLists(await listShoppingLists());
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      await refresh();
-      setLoading(false);
-    })();
-  }, [refresh]);
+  const { loading, error: loadError } = useAsyncEffect(refresh, [refresh]);
 
   async function handleCreate() {
     const name = newName.trim();
     if (!name) return;
-    const id = await createShoppingList(name);
-    setNewName("");
-    await refresh();
-    setSelectedId(id);
+    setActionError(null);
+    try {
+      const id = await createShoppingList(name);
+      setNewName("");
+      await refresh();
+      setSelectedId(id);
+    } catch (err) {
+      setActionError(String(err));
+    }
   }
 
   async function handleRenameSubmit(id: number) {
     const name = renameValue.trim();
-    if (name) await renameShoppingList(id, name);
-    setRenamingId(null);
-    await refresh();
+    setActionError(null);
+    try {
+      if (name) await renameShoppingList(id, name);
+      setRenamingId(null);
+      await refresh();
+    } catch (err) {
+      setActionError(String(err));
+    }
   }
 
   async function confirmDelete() {
     if (!confirmingDelete) return;
-    await deleteShoppingList(confirmingDelete.id);
-    setConfirmingDelete(null);
-    await refresh();
+    setActionError(null);
+    try {
+      await deleteShoppingList(confirmingDelete.id);
+      setConfirmingDelete(null);
+      await refresh();
+    } catch (err) {
+      setActionError(String(err));
+    }
   }
 
   if (selectedId != null) {
@@ -70,9 +81,12 @@ export function ShoppingLists({ onBack }: ShoppingListsProps) {
 
       <div className="shopping-lists__paper">
         <h1>Mes listes de courses</h1>
+        {actionError && <p className="form-error">{actionError}</p>}
 
         {loading ? (
           <LoadingScreen fullScreen={false} />
+        ) : loadError ? (
+          <p className="form-error">{loadError}</p>
         ) : lists.length === 0 ? (
           <p className="shopping-lists__empty">Aucune liste pour l'instant, crées-en une ci-dessous.</p>
         ) : (

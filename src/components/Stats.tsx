@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
   createProfile,
   deleteProfile,
@@ -41,7 +42,8 @@ export function Stats({ onBack }: StatsProps) {
   const [budgetTrend, setBudgetTrend] = useState<ShoppingBudgetPoint[]>([]);
   const [wasteValue, setWasteValue] = useState<number | null>(null);
   const [estimatingWaste, setEstimatingWaste] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [profileSwitchLoading, setProfileSwitchLoading] = useState(false);
 
   const refresh = useCallback(async (profileId: number | null) => {
     const [recipes, categories, profileStats] = await Promise.all([
@@ -54,20 +56,17 @@ export function Stats({ onBack }: StatsProps) {
     setByProfile(profileStats);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      setProfiles(await listProfiles());
-      await refresh(null);
-      setWasteItems(await getWasteAvoidedItems());
-      setBudgetTrend(await getShoppingBudgetTrend());
-      setLoading(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { loading, error: loadError } = useAsyncEffect(async () => {
+    setProfiles(await listProfiles());
+    await refresh(null);
+    setWasteItems(await getWasteAvoidedItems());
+    setBudgetTrend(await getShoppingBudgetTrend());
   }, []);
 
   async function handleEstimateWasteValue() {
     if (wasteItems.length === 0) return;
     setEstimatingWaste(true);
+    setActionError(null);
     try {
       const grouped = new Map<string, { name: string; quantity: number; unit: string | null }>();
       for (const item of wasteItems) {
@@ -82,6 +81,8 @@ export function Stats({ onBack }: StatsProps) {
         total += (range.low + range.high) / 2;
       }
       setWasteValue(Math.round(total * 100) / 100);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setEstimatingWaste(false);
     }
@@ -89,9 +90,15 @@ export function Stats({ onBack }: StatsProps) {
 
   async function selectProfile(id: number | null) {
     setSelectedProfileId(id);
-    setLoading(true);
-    await refresh(id);
-    setLoading(false);
+    setProfileSwitchLoading(true);
+    setActionError(null);
+    try {
+      await refresh(id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProfileSwitchLoading(false);
+    }
   }
 
   async function handleAddProfile(
@@ -102,8 +109,13 @@ export function Stats({ onBack }: StatsProps) {
     age: number | null,
     isGuest: boolean,
   ) {
-    await createProfile({ name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
-    setProfiles(await listProfiles());
+    setActionError(null);
+    try {
+      await createProfile({ name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
+      setProfiles(await listProfiles());
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function handleUpdateProfile(
@@ -115,22 +127,33 @@ export function Stats({ onBack }: StatsProps) {
     age: number | null,
     isGuest: boolean,
   ) {
-    await updateProfile(id, { name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
-    setProfiles(await listProfiles());
-    await refresh(selectedProfileId);
+    setActionError(null);
+    try {
+      await updateProfile(id, { name, color, avatar, dietary_notes: dietaryNotes, age, is_guest: isGuest });
+      setProfiles(await listProfiles());
+      await refresh(selectedProfileId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function handleDeleteProfile(id: number) {
-    await deleteProfile(id);
-    setProfiles(await listProfiles());
-    if (selectedProfileId === id) {
-      await selectProfile(null);
-    } else {
-      await refresh(selectedProfileId);
+    setActionError(null);
+    try {
+      await deleteProfile(id);
+      setProfiles(await listProfiles());
+      if (selectedProfileId === id) {
+        await selectProfile(null);
+      } else {
+        await refresh(selectedProfileId);
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
     }
   }
 
   if (loading) return <LoadingScreen message="Calcul des statistiques..." />;
+  if (loadError) return <p className="status-text status-text--error">Erreur: {loadError}</p>;
 
   const hasAnyData =
     topRecipes.length > 0 || byCategory.length > 0 || byProfile.length > 0 || wasteItems.length > 0 || budgetTrend.length > 0;
@@ -190,7 +213,11 @@ export function Stats({ onBack }: StatsProps) {
         />
       </div>
 
-      {!hasAnyData ? (
+      {actionError && <p className="form-error">{actionError}</p>}
+
+      {profileSwitchLoading ? (
+        <p className="stats__empty">Chargement...</p>
+      ) : !hasAnyData ? (
         <p className="pantry__empty">
           Pas encore de données — marque des recettes comme "faites" et consomme des ingrédients du garde-manger
           pour voir tes statistiques ici.

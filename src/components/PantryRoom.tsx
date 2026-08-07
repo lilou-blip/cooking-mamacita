@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { createStorageUnit, deleteStorageUnit, listPantryItems, listStorageUnits, type PantryItem, type StorageUnit } from "../lib/db";
 import { getStorageIllustration, getStorageOpenBackground } from "../lib/storageIllustrations";
 import { generateVideFrigoRecipe, type RecipeDraft } from "../lib/assistant";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import pantryBackground from "../assets/illustrations/pantry-background.webp";
 import { Pantry } from "./Pantry";
 import { StorageUnitForm } from "./StorageUnitForm";
@@ -33,7 +34,6 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   const isMobile = useIsMobile(640); // le scan de ticket suppose un appareil photo à portée de main
   const [units, setUnits] = useState<StorageUnit[]>([]);
   const [items, setItems] = useState<PantryItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [activeUnitId, setActiveUnitId] = useState<number | "all" | null>(null);
   const [videFrigoLoading, setVideFrigoLoading] = useState(false);
@@ -47,17 +47,18 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
     setItems(itemList);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      await refresh();
-      setLoading(false);
-    })();
-  }, [refresh]);
+  const { loading, error: loadError } = useAsyncEffect(refresh, [refresh]);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function handleCreateUnit(input: { name: string; illustration: string | null }) {
-    await createStorageUnit(input);
-    setShowForm(false);
-    await refresh();
+    setActionError(null);
+    try {
+      await createStorageUnit(input);
+      setShowForm(false);
+      await refresh();
+    } catch (err) {
+      setActionError(String(err));
+    }
   }
 
   async function handleVideFrigo() {
@@ -95,9 +96,14 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
 
   async function confirmDeleteUnit() {
     if (!confirmingDeleteUnit) return;
-    await deleteStorageUnit(confirmingDeleteUnit.id);
-    setConfirmingDeleteUnit(null);
-    await refresh();
+    setActionError(null);
+    try {
+      await deleteStorageUnit(confirmingDeleteUnit.id);
+      setConfirmingDeleteUnit(null);
+      await refresh();
+    } catch (err) {
+      setActionError(String(err));
+    }
   }
 
   if (activeUnitId !== null) {
@@ -116,6 +122,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
   }
 
   if (loading) return <LoadingScreen message="Chargement du garde-manger..." />;
+  if (loadError) return <p className="status-text status-text--error">Erreur: {loadError}</p>;
 
   return (
     <div className="pantry-room" style={{ backgroundImage: `url(${pantryBackground})` }}>
@@ -123,6 +130,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
         ← Table
       </button>
       <h1 className="pantry-room__title">Garde manger</h1>
+      {actionError && <p className="form-error">{actionError}</p>}
 
       <div className="pantry-room__top-actions">
         {units.length > 0 && (

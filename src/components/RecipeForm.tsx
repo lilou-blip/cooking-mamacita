@@ -84,15 +84,19 @@ export function RecipeForm({ recipe, draft, onCreated, onCancel }: RecipeFormPro
 
   useEffect(() => {
     (async () => {
-      const [tags, unitList] = await Promise.all([listAllTags(), listUnits()]);
-      setAllTags(tags);
-      setUnits(unitList);
+      try {
+        const [tags, unitList] = await Promise.all([listAllTags(), listUnits()]);
+        setAllTags(tags);
+        setUnits(unitList);
 
-      if (draft) {
-        const ids = tags
-          .filter((t) => draft.tags.some((dt) => dt.category === t.category && dt.name === t.name))
-          .map((t) => t.id);
-        setSelectedTagIds(new Set(ids));
+        if (draft) {
+          const ids = tags
+            .filter((t) => draft.tags.some((dt) => dt.category === t.category && dt.name === t.name))
+            .map((t) => t.id);
+          setSelectedTagIds(new Set(ids));
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

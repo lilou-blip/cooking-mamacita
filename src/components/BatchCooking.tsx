@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useAsyncEffect } from "../lib/useAsyncEffect";
 import {
   createPantryItem,
   getMenuById,
@@ -67,7 +68,6 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [storageUnits, setStorageUnits] = useState<StorageUnit[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recipesError, setRecipesError] = useState<string | null>(null);
@@ -87,14 +87,11 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [planError, setPlanError] = useState<string | null>(null);
   const [storageAdvice, setStorageAdvice] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    (async () => {
-      const [recipeList, units, profileList] = await Promise.all([listRecipes(), listStorageUnits(), listProfiles()]);
-      setAllRecipes(recipeList);
-      setStorageUnits(units);
-      setProfiles(profileList);
-      setLoading(false);
-    })();
+  const { loading, error: loadError } = useAsyncEffect(async () => {
+    const [recipeList, units, profileList] = await Promise.all([listRecipes(), listStorageUnits(), listProfiles()]);
+    setAllRecipes(recipeList);
+    setStorageUnits(units);
+    setProfiles(profileList);
   }, []);
 
   function toggleSlot(s: MealSlot) {
@@ -108,33 +105,40 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
 
   async function goToRecipes() {
     setWeekMenuName(null);
-
-    const menus = await listMenus();
-    const weekMenu = pickCurrentWeekMenu(menus);
     let initialEntries: BatchEntry[] = [];
+    let loadErrorMessage: string | null = null;
 
-    if (weekMenu) {
-      const full = await getMenuById(weekMenu.id);
-      if (full) {
-        const byRecipe = new Map<number, { title: string; total: number }>();
-        for (const r of full.recipes.filter((r) => r.meal_slot != null && selectedSlots.has(r.meal_slot))) {
-          const existing = byRecipe.get(r.recipe_id) ?? { title: r.title, total: 0 };
-          existing.total += r.servings;
-          byRecipe.set(r.recipe_id, existing);
+    try {
+      const menus = await listMenus();
+      const weekMenu = pickCurrentWeekMenu(menus);
+
+      if (weekMenu) {
+        const full = await getMenuById(weekMenu.id);
+        if (full) {
+          const byRecipe = new Map<number, { title: string; total: number }>();
+          for (const r of full.recipes.filter((r) => r.meal_slot != null && selectedSlots.has(r.meal_slot))) {
+            const existing = byRecipe.get(r.recipe_id) ?? { title: r.title, total: 0 };
+            existing.total += r.servings;
+            byRecipe.set(r.recipe_id, existing);
+          }
+          if (byRecipe.size > 0) setWeekMenuName(full.name);
+          initialEntries = [...byRecipe.entries()].map(([recipeId, { title, total }]) => ({
+            recipeId,
+            title,
+            suggestedTotal: total,
+            totalQuantity: String(total),
+            chunks: [makeChunk()],
+          }));
         }
-        if (byRecipe.size > 0) setWeekMenuName(full.name);
-        initialEntries = [...byRecipe.entries()].map(([recipeId, { title, total }]) => ({
-          recipeId,
-          title,
-          suggestedTotal: total,
-          totalQuantity: String(total),
-          chunks: [makeChunk()],
-        }));
       }
+    } catch (err) {
+      // Le menu de la semaine n'a pas pu être détecté : on continue quand même vers l'étape recettes
+      // (liste vide, à composer à la main) plutôt que de bloquer sur l'étape créneaux.
+      loadErrorMessage = err instanceof Error ? err.message : String(err);
     }
 
     setEntries(initialEntries);
-    setRecipesError(null);
+    setRecipesError(loadErrorMessage);
     setStep("recipes");
   }
 
@@ -327,6 +331,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   }
 
   if (loading) return <LoadingScreen message="Chargement..." />;
+  if (loadError) return <p className="status-text status-text--error">Erreur: {loadError}</p>;
 
   const availableToAdd = allRecipes.filter((r) => !entries.some((e) => e.recipeId === r.id));
   const slotLabels = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value)).map((s) => s.label);
