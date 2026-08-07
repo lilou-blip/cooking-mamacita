@@ -102,6 +102,36 @@ export async function listRecipesWithTags(): Promise<RecipeCard[]> {
   }));
 }
 
+/** Recettes dont TOUS les ingrédients sont déjà au garde-manger (quel que soit la quantité disponible —
+ * juste "y en a-t-il", pas "y en a-t-il assez", pour rester simple et rapide). */
+export async function getCookableRecipeIds(): Promise<Set<number>> {
+  const [pantryRows, ingredientRows] = await Promise.all([
+    supabase
+      .from("pantry_items")
+      .select("ingredient_id")
+      .gt("quantity", 0)
+      .then((r) => unwrap<{ ingredient_id: number }[]>(r)),
+    supabase
+      .from("recipe_ingredients")
+      .select("recipe_id, ingredient_id")
+      .then((r) => unwrap<{ recipe_id: number; ingredient_id: number }[]>(r)),
+  ]);
+
+  const pantryIds = new Set(pantryRows.map((r) => r.ingredient_id));
+  const byRecipe = new Map<number, number[]>();
+  for (const row of ingredientRows) {
+    const list = byRecipe.get(row.recipe_id) ?? [];
+    list.push(row.ingredient_id);
+    byRecipe.set(row.recipe_id, list);
+  }
+
+  const cookable = new Set<number>();
+  for (const [recipeId, ids] of byRecipe.entries()) {
+    if (ids.length > 0 && ids.every((id) => pantryIds.has(id))) cookable.add(recipeId);
+  }
+  return cookable;
+}
+
 export async function listAllTags(): Promise<Tag[]> {
   return unwrap(await supabase.from("tags").select("id, category, name").order("category").order("name"));
 }
@@ -978,6 +1008,54 @@ export async function previewBatchIngredients(
     });
   }
   return result.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
+}
+
+export interface MissingIngredient {
+  ingredient_name: string;
+  quantity: number;
+  unit_abbreviation: string | null;
+}
+
+/** Ingrédients d'une recette (à un nombre de portions donné) dont le garde-manger n'a pas assez — juste la
+ * quantité qui manque, pas tout le besoin (contrairement à previewBatchIngredients, pensé pour une seule
+ * recette affichée sur sa fiche plutôt que pour préparer une séance de batch cooking). */
+export async function getMissingIngredientsForRecipe(recipeId: number, servings: number): Promise<MissingIngredient[]> {
+  const recipe = await getRecipeById(recipeId);
+  if (!recipe || recipe.servings <= 0 || servings <= 0) return [];
+
+  const units = await listUnits();
+  const { unitById, unitTypeOf, toBase } = createUnitConverter(units);
+  const scale = servings / recipe.servings;
+
+  const pantryRows = unwrap<{ ingredient_id: number; unit_id: number | null; quantity: number }[]>(
+    await supabase.from("pantry_items").select("ingredient_id, unit_id, quantity"),
+  );
+  const pantryBaseByKey = new Map<string, number>();
+  for (const row of pantryRows) {
+    const baseQty = toBase(row.quantity, row.unit_id);
+    const key = `${row.ingredient_id}:${unitTypeOf(row.unit_id)}`;
+    pantryBaseByKey.set(key, (pantryBaseByKey.get(key) ?? 0) + baseQty);
+  }
+
+  const missing: MissingIngredient[] = [];
+  for (const ing of recipe.ingredients) {
+    if (ing.quantity == null) continue;
+    const scaledQty = ing.quantity * scale;
+    const baseQty = toBase(scaledQty, ing.unit_id);
+    const key = `${ing.ingredient_id}:${unitTypeOf(ing.unit_id)}`;
+    const have = pantryBaseByKey.get(key) ?? 0;
+    if (have >= baseQty) continue;
+
+    const unit = ing.unit_id != null ? unitById.get(ing.unit_id) : undefined;
+    const shortBase = baseQty - have;
+    const shortDisplay = unit ? shortBase / unit.factor_to_base : shortBase;
+    missing.push({
+      ingredient_name: ing.ingredient_name,
+      quantity: Math.round(shortDisplay * 100) / 100,
+      unit_abbreviation: unit?.abbreviation ?? null,
+    });
+  }
+  return missing;
 }
 
 /** Produits de base qu'on veut se voir suggérer dès qu'il en reste peu, même s'ils ne sont pas requis par le menu. */

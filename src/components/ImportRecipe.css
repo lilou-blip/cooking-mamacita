@@ -37,6 +37,17 @@
   flex: 1;
 }
 
+.import-recipe__photo-row {
+  display: flex;
+  justify-content: center;
+  margin-top: -4px;
+}
+.import-recipe__photo-row button {
+  border: 1.5px dashed var(--color-blush-deep);
+  border-radius: var(--radius-card);
+  padding: 8px 16px;
+}
+
 .import-recipe__actions {
   display: flex;
   justify-content: flex-end;

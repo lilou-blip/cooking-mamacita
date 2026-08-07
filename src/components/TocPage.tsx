@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listAllTags, type RecipeCard, type Tag } from "../lib/db";
+import { getCookableRecipeIds, listAllTags, type RecipeCard, type Tag } from "../lib/db";
 import { TAG_CATEGORY_LABELS, TAG_CATEGORY_ORDER } from "../lib/constants";
 import { getCurrentSeason, seasonEmoji } from "../lib/seasons";
 import "./TocPage.css";
@@ -20,9 +20,12 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("date");
   const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
+  const [cookableIds, setCookableIds] = useState<Set<number> | null>(null);
+  const [showOnlyCookable, setShowOnlyCookable] = useState(false);
 
   useEffect(() => {
     listAllTags().then(setAllTags);
+    getCookableRecipeIds().then(setCookableIds);
   }, []);
 
   const currentSeason = getCurrentSeason();
@@ -61,6 +64,7 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
         const matchesIngredient = recipe.ingredient_names.some((n) => n.toLowerCase().includes(query));
         if (!matchesTitle && !matchesIngredient) return false;
       }
+      if (showOnlyCookable && !cookableIds?.has(recipe.id)) return false;
       return true;
     });
 
@@ -69,20 +73,33 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport }: T
       if (sortBy === "made") return b.made_count - a.made_count;
       return 0; // "date": déjà trié par date de création côté DB
     });
-  }, [recipes, search, sortBy, selectedTagIds]);
+  }, [recipes, search, sortBy, selectedTagIds, showOnlyCookable, cookableIds]);
 
   return (
     <div className="toc-page">
       <h1 className="toc-page__title">Sommaire</h1>
 
-      {seasonTag && seasonRecipeCount > 0 && (
-        <button
-          type="button"
-          className={`toc-page__season${seasonFilterActive ? " toc-page__season--active" : ""}`}
-          onClick={toggleSeasonFilter}
-        >
-          {seasonEmoji(currentSeason)} Recettes de saison ({seasonRecipeCount})
-        </button>
+      {((seasonTag && seasonRecipeCount > 0) || (cookableIds && cookableIds.size > 0)) && (
+        <div className="toc-page__quick-filters">
+          {seasonTag && seasonRecipeCount > 0 && (
+            <button
+              type="button"
+              className={`toc-page__season${seasonFilterActive ? " toc-page__season--active" : ""}`}
+              onClick={toggleSeasonFilter}
+            >
+              {seasonEmoji(currentSeason)} Recettes de saison ({seasonRecipeCount})
+            </button>
+          )}
+          {cookableIds && cookableIds.size > 0 && (
+            <button
+              type="button"
+              className={`toc-page__season${showOnlyCookable ? " toc-page__season--active" : ""}`}
+              onClick={() => setShowOnlyCookable((v) => !v)}
+            >
+              🍽️ Je peux faire maintenant ({cookableIds.size})
+            </button>
+          )}
+        </div>
       )}
 
       <div className="toc-page__controls">

@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { fetchRecipeTextFromUrl, structureRecipeFromText, type RecipeDraft } from "../lib/ollama";
+import { useRef, useState, type FormEvent } from "react";
+import { fetchRecipeTextFromUrl, structureRecipeFromImage, structureRecipeFromText, type RecipeDraft } from "../lib/ollama";
 import "./ImportRecipe.css";
 
 interface ImportRecipeProps {
@@ -7,12 +7,40 @@ interface ImportRecipeProps {
   onCancel: () => void;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchingUrl, setFetchingUrl] = useState(false);
+  const [scanningPhoto, setScanningPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handlePhotoFile(file: File) {
+    setScanningPhoto(true);
+    setError(null);
+    try {
+      const base64 = await fileToBase64(file);
+      const draft = await structureRecipeFromImage(base64, file.type || "image/jpeg");
+      onDrafted(draft);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScanningPhoto(false);
+    }
+  }
 
   async function handleFetchUrl() {
     if (!url.trim()) return;
@@ -62,6 +90,28 @@ export function ImportRecipe({ onDrafted, onCancel }: ImportRecipeProps) {
         />
         <button type="button" className="form-cancel" onClick={handleFetchUrl} disabled={fetchingUrl || loading || !url.trim()}>
           {fetchingUrl ? "Récupération..." : "🔗 Récupérer le texte"}
+        </button>
+      </div>
+
+      <div className="import-recipe__photo-row">
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handlePhotoFile(file);
+          }}
+        />
+        <button
+          type="button"
+          className="form-cancel"
+          onClick={() => photoInputRef.current?.click()}
+          disabled={scanningPhoto || loading}
+        >
+          {scanningPhoto ? "Mamacita lit la photo... (10-30s)" : "📸 Scanner une recette papier"}
         </button>
       </div>
 

@@ -185,6 +185,17 @@
   color: var(--color-groseille-deep);
   white-space: nowrap;
 }
+
+.book-page__missing {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  border-radius: var(--radius-tag);
+  padding: 8px 14px;
+  margin: 0 0 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
 .book-page__ingredients ul {
   list-style: none;
   margin: 0;

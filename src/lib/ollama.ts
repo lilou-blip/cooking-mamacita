@@ -140,6 +140,34 @@ export async function structureRecipeFromText(rawText: string): Promise<RecipeDr
   return normalizeDraft(parsed, tags, units);
 }
 
+/** Recette photographiée (manuscrite, page d'un livre de cuisine, capture d'écran...) : même schéma que
+ * structureRecipeFromText mais lue directement depuis l'image (Claude sait lire une écriture manuscrite). */
+export async function structureRecipeFromImage(imageBase64: string, mediaType: string): Promise<RecipeDraft> {
+  const [tags, units] = await Promise.all([listAllTags(), listUnits()]);
+  const systemPrompt = `${buildSystemPrompt(tags, units)}
+La recette t'est donnée en photo (manuscrite, page de livre de cuisine, capture d'écran...) : lis-la attentivement, y compris si l'écriture est manuscrite ou l'image légèrement inclinée/floue.`;
+
+  const { data, error } = await supabase.functions.invoke<{ content: string }>("ai-proxy", {
+    body: {
+      systemPrompt,
+      userMessage: "Voici la photo de la recette à structurer.",
+      numPredict: 900,
+      image: imageBase64,
+      mediaType,
+    },
+  });
+  if (error) throw new Error(`Impossible de lire la recette : ${await describeFunctionError(error)}`);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data!.content);
+  } catch {
+    throw new Error("L'IA n'a pas renvoyé un JSON valide. Réessaie avec une photo plus nette.");
+  }
+
+  return normalizeDraft(parsed, tags, units);
+}
+
 /** Propose une recette "vide-frigo" inventée par l'IA en utilisant en priorité les aliments du garde-manger fournis (les plus proches de la péremption en premier). */
 export async function generateVideFrigoRecipe(
   items: { name: string; daysLeft: number | null }[],

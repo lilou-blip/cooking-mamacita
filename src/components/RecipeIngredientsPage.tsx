@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { getOrCreateRecipeShareToken, type RecipeFull, type RecipeIngredientView } from "../lib/db";
+import { useEffect, useState } from "react";
+import {
+  getMissingIngredientsForRecipe,
+  getOrCreateRecipeShareToken,
+  type MissingIngredient,
+  type RecipeFull,
+  type RecipeIngredientView,
+} from "../lib/db";
 import { estimatePriceRange } from "../lib/ollama";
 import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
@@ -26,6 +32,17 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [cost, setCost] = useState<{ low: number; high: number } | null>(null);
   const [estimatingCost, setEstimatingCost] = useState(false);
   const [shareStatus, setShareStatus] = useState<"idle" | "loading" | "copied" | "error">("idle");
+  const [missing, setMissing] = useState<MissingIngredient[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMissingIngredientsForRecipe(recipe.id, servings).then((result) => {
+      if (!cancelled) setMissing(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [recipe.id, servings]);
 
   async function handleShare() {
     setShareStatus("loading");
@@ -142,6 +159,14 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
             </button>
           )}
         </div>
+        {missing && missing.length > 0 && (
+          <p className="book-page__missing">
+            ⚠️ Il te manque :{" "}
+            {missing
+              .map((m) => `${m.quantity}${m.unit_abbreviation ? ` ${m.unit_abbreviation}` : ""} ${m.ingredient_name}`)
+              .join(", ")}
+          </p>
+        )}
         <ul>
           {recipe.ingredients.map((ing) => (
             <li key={ing.id}>
