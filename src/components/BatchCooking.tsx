@@ -4,7 +4,6 @@ import {
   createPantryItem,
   getMenuById,
   getRecipeById,
-  getTopMadeRecipes,
   listMenus,
   listProfiles,
   listRecipes,
@@ -18,7 +17,7 @@ import {
   type RecipeIngredientView,
   type StorageUnit,
 } from "../lib/db";
-import { suggestBatchCookingPlan } from "../lib/assistant";
+import { suggestBatchCookingPlan, suggestBatchCookingSelection } from "../lib/assistant";
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
 import { MEAL_SLOTS } from "../lib/constants";
 import { LoadingScreen } from "./LoadingScreen";
@@ -46,6 +45,7 @@ interface BatchEntry {
   title: string;
   suggestedTotal: number | null;
   totalQuantity: string;
+  mealSlots: MealSlot[];
   chunks: StorageChunk[];
 }
 
@@ -65,6 +65,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [selectedSlots, setSelectedSlots] = useState<Set<MealSlot>>(new Set());
   const [selectedProfileIds, setSelectedProfileIds] = useState<Set<number>>(new Set());
   const [manualHeadcount, setManualHeadcount] = useState("");
+  const [durationDays, setDurationDays] = useState("7");
   const [weekMenuName, setWeekMenuName] = useState<string | null>(null);
   const [entries, setEntries] = useState<BatchEntry[]>([]);
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
@@ -123,6 +124,13 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     return manual > 0 ? manual : null;
   }
 
+  // Nombre de jours à couvrir par cette séance de batch cooking (une semaine par défaut, mais ajustable
+  // pour préparer plus large — les quantités par défaut se calculent alors sur personnes × jours).
+  function getDurationDays(): number {
+    const n = Number(durationDays);
+    return n > 0 ? Math.round(n) : 7;
+  }
+
   async function goToRecipes() {
     setWeekMenuName(null);
     let initialEntries: BatchEntry[] = [];
@@ -135,18 +143,20 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
       if (weekMenu) {
         const full = await getMenuById(weekMenu.id);
         if (full) {
-          const byRecipe = new Map<number, { title: string; total: number }>();
+          const byRecipe = new Map<number, { title: string; total: number; slots: Set<MealSlot> }>();
           for (const r of full.recipes.filter((r) => r.meal_slot != null && selectedSlots.has(r.meal_slot))) {
-            const existing = byRecipe.get(r.recipe_id) ?? { title: r.title, total: 0 };
+            const existing = byRecipe.get(r.recipe_id) ?? { title: r.title, total: 0, slots: new Set<MealSlot>() };
             existing.total += r.servings;
+            if (r.meal_slot) existing.slots.add(r.meal_slot);
             byRecipe.set(r.recipe_id, existing);
           }
           if (byRecipe.size > 0) setWeekMenuName(full.name);
-          initialEntries = [...byRecipe.entries()].map(([recipeId, { title, total }]) => ({
+          initialEntries = [...byRecipe.entries()].map(([recipeId, { title, total, slots }]) => ({
             recipeId,
             title,
             suggestedTotal: total,
             totalQuantity: String(total),
+            mealSlots: [...slots],
             chunks: [makeChunk()],
           }));
         }
@@ -166,41 +176,59 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     const recipe = allRecipes.find((r) => r.id === recipeId);
     if (!recipe || entries.some((e) => e.recipeId === recipeId)) return;
     const headcount = getHeadcount();
+    const total = headcount != null ? headcount * getDurationDays() : null;
     setEntries((prev) => [
       ...prev,
       {
         recipeId,
         title: recipe.title,
         suggestedTotal: null,
-        totalQuantity: headcount != null ? String(headcount) : "",
+        totalQuantity: total != null ? String(total) : "",
+        mealSlots: selectedSlots.size === 1 ? [...selectedSlots] : [],
         chunks: [makeChunk()],
       },
     ]);
   }
 
+  // Fait choisir à l'IA des recettes du carnet adaptées à chaque créneau sélectionné (pas de plat salé
+  // complet pour un goûter par ex.), en quantité suffisante pour couvrir la durée choisie, réparties entre
+  // plusieurs recettes par créneau pour varier plutôt que répéter la même chose tous les jours.
   async function letAppChoose() {
     setChoosingForMe(true);
+    setRecipesError(null);
     try {
-      const headcount = getHeadcount();
-      const top = await getTopMadeRecipes(8, null);
-      let candidateIds = top.map((t) => t.recipe_id).filter((id) => !entries.some((e) => e.recipeId === id));
-      if (candidateIds.length === 0) {
-        candidateIds = allRecipes.map((r) => r.id).filter((id) => !entries.some((e) => e.recipeId === id));
+      const headcount = getHeadcount() ?? 4;
+      const days = getDurationDays();
+      const slots = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value));
+      const selections = (await suggestBatchCookingSelection(slots, headcount, days)).filter(
+        (s) => !entries.some((e) => e.recipeId === s.recipe_id),
+      );
+      if (selections.length === 0) {
+        setRecipesError("Mamacita n'a pas trouvé de recette adaptée dans ton carnet pour ces créneaux.");
+        return;
       }
-      const chosen = candidateIds
-        .slice(0, 3)
-        .map((id) => allRecipes.find((r) => r.id === id))
-        .filter((r): r is Recipe => r != null);
+      const byRecipe = new Map<number, { title: string; total: number; slots: Set<MealSlot> }>();
+      for (const s of selections) {
+        const recipe = allRecipes.find((r) => r.id === s.recipe_id);
+        if (!recipe) continue;
+        const existing = byRecipe.get(s.recipe_id) ?? { title: recipe.title, total: 0, slots: new Set<MealSlot>() };
+        existing.total += s.total_servings;
+        existing.slots.add(s.meal_slot);
+        byRecipe.set(s.recipe_id, existing);
+      }
       setEntries((prev) => [
         ...prev,
-        ...chosen.map((r) => ({
-          recipeId: r.id,
-          title: r.title,
+        ...[...byRecipe.entries()].map(([recipeId, { title, total, slots: recipeSlots }]) => ({
+          recipeId,
+          title,
           suggestedTotal: null,
-          totalQuantity: String(headcount ?? r.servings),
+          totalQuantity: String(total),
+          mealSlots: [...recipeSlots],
           chunks: [makeChunk()],
         })),
       ]);
+    } catch (err) {
+      setRecipesError(err instanceof Error ? err.message : String(err));
     } finally {
       setChoosingForMe(false);
     }
@@ -364,6 +392,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const availableToAdd = allRecipes.filter((r) => !entries.some((e) => e.recipeId === r.id));
   const slotLabels = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value)).map((s) => s.label);
   const headcount = getHeadcount();
+  const days = getDurationDays();
   const backLabel =
     step === "slots" ? "← Garde-manger" : step === "recipes" ? "← Créneaux" : step === "plan" ? "← Recettes" : "← Plan";
 
@@ -395,9 +424,24 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
               ))}
             </div>
 
+            <div className="batch-cooking__headcount">
+              <label>
+                Sur combien de jours ?
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={durationDays}
+                  onChange={(e) => setDurationDays(e.target.value)}
+                  placeholder="7"
+                />
+              </label>
+            </div>
+
             <p className="batch-cooking__hint">
-              Pour qui ? Ça permet de pré-remplir automatiquement les quantités à cuisiner (une portion par
-              personne), plutôt que de les saisir à la main pour chaque recette.
+              Pour qui ? Ça permet de pré-remplir automatiquement les quantités à cuisiner pour toute la
+              durée choisie (une portion par personne et par jour), plutôt que de les saisir à la main pour
+              chaque recette.
             </p>
             {profiles.length > 0 && (
               <div className="batch-cooking__slots">
@@ -450,7 +494,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
               {weekMenuName
                 ? `Détecté depuis le menu "${weekMenuName}" (${slotLabels.join(" + ")}) — quantités calculées, ajustables si besoin.`
                 : headcount != null
-                  ? `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — quantités par défaut calculées pour ${headcount} personne${headcount > 1 ? "s" : ""}, ajustables si besoin.`
+                  ? `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — quantités par défaut calculées pour ${headcount} personne${headcount > 1 ? "s" : ""} sur ${days} jour${days > 1 ? "s" : ""}, ajustables si besoin.`
                   : `Rien de planifié pour ${slotLabels.join(" + ")} cette semaine — ajoute les recettes à préparer, ou laisse Mamacita choisir.`}
             </p>
             {recipesError && <p className="form-error">{recipesError}</p>}
@@ -469,6 +513,12 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                   <li key={entry.recipeId} className="batch-cooking__entry">
                     <div className="batch-cooking__entry-header">
                       <span className="batch-cooking__entry-title">{entry.title}</span>
+                      {selectedSlots.size > 1 &&
+                        entry.mealSlots.map((slot) => (
+                          <span key={slot} className="batch-cooking__entry-slot">
+                            {MEAL_SLOTS.find((s) => s.value === slot)?.label ?? slot}
+                          </span>
+                        ))}
                       {entry.suggestedTotal != null && (
                         <span className="batch-cooking__entry-suggested">planifié : {entry.suggestedTotal} portions</span>
                       )}

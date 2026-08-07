@@ -129,6 +129,15 @@
   font-weight: 800;
   color: var(--color-groseille-deep);
 }
+.batch-cooking__entry-slot {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+  border-radius: var(--radius-tag);
+  padding: 2px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .batch-cooking__entry-suggested {
   font-size: 0.74rem;
   color: var(--color-ink-soft);

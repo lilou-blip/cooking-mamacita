@@ -5,6 +5,7 @@ import {
   listPantryItems,
   listRecipesWithTags,
   listUnits,
+  type MealSlot,
   type NutritionEstimate,
   type Tag,
   type TagCategory,
@@ -273,6 +274,67 @@ ${recipeList}`;
     : [];
 
   return suggestions;
+}
+
+export interface BatchCookingSelection {
+  meal_slot: MealSlot;
+  recipe_id: number;
+  total_servings: number;
+}
+
+/**
+ * Choisit, pour chaque créneau repas demandé, quelques recettes du carnet adaptées à ce moment de la
+ * journée (évite par ex. un plat salé complet pour un goûter) et en quantité suffisante pour couvrir la
+ * durée demandée — répartie entre 2 à 4 recettes différentes par créneau pour varier plutôt que répéter
+ * la même recette tous les jours.
+ */
+export async function suggestBatchCookingSelection(
+  slots: { value: MealSlot; label: string }[],
+  headcount: number,
+  days: number,
+): Promise<BatchCookingSelection[]> {
+  if (slots.length === 0 || headcount <= 0 || days <= 0) return [];
+
+  const recipes = await listRecipesWithTags();
+  if (recipes.length === 0) return [];
+
+  const recipeList = recipes.map((r) => `${r.id} | ${r.title} | ${r.tags.map((t) => t.name).join(", ") || "sans tag"}`).join("\n");
+  const slotsList = slots.map((s) => `${s.value} (${s.label})`).join(", ");
+  const targetPerSlot = headcount * days;
+
+  const systemPrompt = `Tu choisis quelles recettes du carnet de l'utilisateur cuisiner à l'avance (batch cooking) pour couvrir un ou plusieurs créneaux repas sur plusieurs jours, en piochant UNIQUEMENT parmi les recettes fournies.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après :
+{"selections": [{"meal_slot": string, "recipe_id": nombre, "total_servings": nombre}]}
+
+Créneaux à couvrir : ${slotsList}.
+Pour CHAQUE créneau, choisis entre 2 et 4 recettes DIFFÉRENTES et adaptées à ce moment de la journée (ex: pas de plat salé complet type gratin/viande en sauce pour un petit-déjeuner ou un goûter — privilégie pour ces deux créneaux des recettes sucrées, légères ou de type "dessert"/en-cas ; pour déjeuner/dîner privilégie les recettes de type "plat" ou "entrée"). Base-toi sur le titre et les tags de chaque recette.
+La somme des "total_servings" des recettes choisies pour un créneau donné doit avoisiner ${targetPerSlot} portions (= ${headcount} personne(s) × ${days} jour(s)), réparties entre les recettes pour varier plutôt que répéter la même recette tous les jours.
+N'invente jamais de recette ni d'id : choisis uniquement parmi la liste ci-dessous. Si vraiment aucune recette ne convient bien à un créneau, tu peux en choisir moins, plutôt que de forcer un mauvais choix.
+
+Recettes disponibles (id | titre | tags) :
+${recipeList}`;
+
+  const parsed = await callAiJson(systemPrompt, "Choisis les recettes de batch cooking.", 700);
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const validIds = new Set(recipes.map((r) => r.id));
+  const validSlots = new Set(slots.map((s) => s.value));
+
+  return Array.isArray(obj.selections)
+    ? (obj.selections as Record<string, unknown>[])
+        .filter(
+          (s): s is Record<string, unknown> =>
+            !!s &&
+            typeof s.recipe_id === "number" &&
+            validIds.has(s.recipe_id) &&
+            typeof s.meal_slot === "string" &&
+            validSlots.has(s.meal_slot as MealSlot),
+        )
+        .map((s) => ({
+          meal_slot: s.meal_slot as MealSlot,
+          recipe_id: s.recipe_id as number,
+          total_servings: typeof s.total_servings === "number" && s.total_servings > 0 ? Math.round(s.total_servings) : headcount,
+        }))
+    : [];
 }
 
 export interface PriceRange {
