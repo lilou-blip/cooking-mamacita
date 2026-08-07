@@ -34,7 +34,7 @@
    l'épingle décorative centrée au-dessus du titre — on pousse le titre plus bas pour ne jamais s'en approcher,
    plutôt que d'ajuster la largeur de la rangée à la main (fragile si un bouton est ajouté/retiré plus tard). */
 .book-page__page-actions + .book-page__header {
-  margin-top: 38px;
+  margin-top: 48px;
 }
 
 .book-page__title-tag {
