@@ -44,6 +44,9 @@ const RecipeIngredientsPage = lazy(() =>
 const RecipeStepsPage = lazy(() => import("./components/RecipeStepsPage").then((m) => ({ default: m.RecipeStepsPage })));
 const RecipeForm = lazy(() => import("./components/RecipeForm").then((m) => ({ default: m.RecipeForm })));
 const ImportRecipe = lazy(() => import("./components/ImportRecipe").then((m) => ({ default: m.ImportRecipe })));
+const RecipeBookExport = lazy(() =>
+  import("./components/RecipeBookExport").then((m) => ({ default: m.RecipeBookExport })),
+);
 
 type View = "toc" | "book" | "form" | "import";
 type Section = "table" | "carnet" | "pantry" | "menus" | "stats" | "shopping" | "batch";
@@ -90,6 +93,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
   const [turning, setTurning] = useState<TurnDirection | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [notifPermission, setNotifPermission] = useState(notificationPermission());
+  const [exportingPdf, setExportingPdf] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const isMobile = useIsMobile();
 
@@ -407,6 +411,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
               onSelect={openMobile}
               onAddNew={handleAddNew}
               onImport={handleImportClick}
+              onExportPdf={() => setExportingPdf(true)}
               onDuplicate={handleDuplicate}
               onToggleFavorite={handleToggleFavorite}
             />
@@ -453,6 +458,7 @@ function App({ onLogout, initialSharedImport }: AppProps) {
               onSelect={setSelectedTocId}
               onAddNew={handleAddNew}
               onImport={handleImportClick}
+              onExportPdf={() => setExportingPdf(true)}
               onDuplicate={handleDuplicate}
               onToggleFavorite={handleToggleFavorite}
             />
@@ -529,6 +535,11 @@ function App({ onLogout, initialSharedImport }: AppProps) {
         currentRecipeTitle={section === "carnet" && view === "book" ? currentRecipe?.title : undefined}
       />
       <FloatingTimerBar />
+      {exportingPdf && (
+        <Suspense fallback={<LoadingScreen />}>
+          <RecipeBookExport recipes={recipes} onClose={() => setExportingPdf(false)} />
+        </Suspense>
+      )}
       {confirmingDelete && currentRecipe && (
         <ConfirmDialog
           message={`Supprimer "${currentRecipe.title}" ? Cette action est irréversible.`}

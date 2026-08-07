@@ -1,0 +1,114 @@
+.recipe-book-export {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: var(--color-cream);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.recipe-book-export__toolbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--color-cream);
+  padding-bottom: 12px;
+  z-index: 1;
+}
+
+.recipe-book-export__pages {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.recipe-book-export__cover {
+  text-align: center;
+  padding: 60px 0 40px;
+}
+.recipe-book-export__cover h1 {
+  font-family: var(--font-title);
+  font-size: 3rem;
+  color: var(--color-groseille-deep);
+  margin: 0 0 10px;
+}
+.recipe-book-export__cover p {
+  color: var(--color-ink-soft);
+}
+
+.recipe-book-export__recipe {
+  background: var(--color-white);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px 32px;
+  margin-bottom: 24px;
+}
+.recipe-book-export__recipe h2 {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  color: var(--color-groseille-deep);
+  margin: 0 0 6px;
+}
+.recipe-book-export__meta,
+.recipe-book-export__tags {
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 4px;
+}
+.recipe-book-export__columns {
+  display: flex;
+  gap: 32px;
+  margin-top: 16px;
+}
+.recipe-book-export__columns > div {
+  flex: 1;
+  min-width: 0;
+}
+.recipe-book-export__columns h3 {
+  font-size: 1.1rem;
+  color: var(--color-groseille-deep);
+  margin: 0 0 8px;
+}
+.recipe-book-export__columns ul,
+.recipe-book-export__columns ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-ink);
+  font-size: 0.92rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.recipe-book-export__notes {
+  margin-top: 16px;
+  font-size: 0.88rem;
+  color: var(--color-ink);
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  padding: 10px 14px;
+}
+
+@media print {
+  .recipe-book-export {
+    position: static;
+    background: white;
+    padding: 0;
+    overflow: visible;
+  }
+  .recipe-book-export__toolbar {
+    display: none;
+  }
+  .recipe-book-export__cover {
+    padding: 20% 0;
+  }
+  .recipe-book-export__cover,
+  .recipe-book-export__recipe {
+    page-break-after: always;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .recipe-book-export__recipe:last-child {
+    page-break-after: auto;
+  }
+}

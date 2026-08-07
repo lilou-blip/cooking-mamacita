@@ -267,13 +267,52 @@
 }
 .book-page__ingredients li {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   font-size: 0.9rem;
+}
+.book-page__ingredient-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .book-page__ingredient-qty {
   font-weight: 800;
   color: var(--color-groseille);
   min-width: 60px;
+}
+.book-page__substitute-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--color-ink-soft);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.book-page__substitute-btn:hover:not(:disabled) {
+  background: var(--color-blush);
+  color: var(--color-groseille-deep);
+}
+.book-page__substitute-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.book-page__ingredients ul.book-page__substitute-list {
+  flex-direction: column;
+  gap: 3px;
+  margin: 0 0 0 68px;
+  padding: 6px 12px;
+  background: var(--color-cream);
+  border-radius: var(--radius-tag);
+  font-size: 0.8rem;
+  color: var(--color-ink);
+}
+.book-page__substitute-empty {
+  color: var(--color-ink-soft);
+  font-style: italic;
 }
 
 .book-page__steps-header {

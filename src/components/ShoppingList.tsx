@@ -14,6 +14,7 @@ import {
 } from "../lib/db";
 import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/assistant";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
+import { getCategoryOrder, saveCategoryOrder, swapCategories } from "../lib/shoppingCategoryOrder";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import { LoadingScreen } from "./LoadingScreen";
@@ -45,6 +46,8 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   const [newQuantity, setNewQuantity] = useState("");
   const [newUnitAbbr, setNewUnitAbbr] = useState("");
   const [copied, setCopied] = useState(false);
+  const [categoryOrder, setCategoryOrder] = useState<string[]>(() => getCategoryOrder());
+  const [reordering, setReordering] = useState(false);
   const autoEstimated = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -248,13 +251,28 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
   const total = list.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   const missingPriceCount = list.items.filter((i) => i.price == null).length;
-  // Groupé par catégorie (dans l'ordre de INGREDIENT_CATEGORIES, qui suit à peu près les rayons d'un
-  // supermarché) plutôt qu'en une liste plate, pour ne pas zigzaguer entre les rayons pendant les courses.
-  const groupedItems = INGREDIENT_CATEGORIES.map((c) => ({
-    category: c.value,
-    label: c.label,
-    items: list.items.filter((item) => item.ingredient_category === c.value),
-  })).filter((group) => group.items.length > 0);
+  // Groupé par catégorie (dans l'ordre choisi par l'utilisateur, par défaut celui de INGREDIENT_CATEGORIES
+  // qui suit à peu près les rayons d'un supermarché type) plutôt qu'en une liste plate, pour ne pas
+  // zigzaguer entre les rayons pendant les courses.
+  const categoryLabelByValue = Object.fromEntries(INGREDIENT_CATEGORIES.map((c) => [c.value, c.label]));
+  const groupedItems = categoryOrder
+    .map((value) => ({
+      category: value,
+      label: categoryLabelByValue[value] ?? value,
+      items: list.items.filter((item) => item.ingredient_category === value),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  function moveCategory(value: string, direction: -1 | 1) {
+    const visible = groupedItems.map((g) => g.category);
+    const target = visible[visible.indexOf(value) + direction];
+    if (!target) return;
+    setCategoryOrder((prev) => {
+      const next = swapCategories(prev, value, target);
+      saveCategoryOrder(next);
+      return next;
+    });
+  }
 
   return (
     <div className="shopping-list">
@@ -269,9 +287,16 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
         <h1>{list.name}</h1>
 
         {list.items.length > 0 && (
-          <button type="button" className="shopping-list__export" onClick={handleExport}>
-            {copied ? "✓ Copié !" : "📋 Copier la liste"}
-          </button>
+          <div className="shopping-list__toolbar">
+            <button type="button" className="shopping-list__export" onClick={handleExport}>
+              {copied ? "✓ Copié !" : "📋 Copier la liste"}
+            </button>
+            {groupedItems.length > 1 && (
+              <button type="button" className="shopping-list__export" onClick={() => setReordering((r) => !r)}>
+                {reordering ? "✓ Terminé" : "↕️ Réordonner les rayons"}
+              </button>
+            )}
+          </div>
         )}
 
         {error && <p className="form-error">{error}</p>}
@@ -282,7 +307,29 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
           <ul className="shopping-list__items">
             {groupedItems.map((group) => (
               <Fragment key={group.category}>
-                <li className="shopping-list__category-header">{group.label}</li>
+                <li className="shopping-list__category-header">
+                  <span>{group.label}</span>
+                  {reordering && (
+                    <span className="shopping-list__category-reorder">
+                      <button
+                        type="button"
+                        onClick={() => moveCategory(group.category, -1)}
+                        disabled={groupedItems.indexOf(group) === 0}
+                        aria-label={`Monter le rayon ${group.label}`}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveCategory(group.category, 1)}
+                        disabled={groupedItems.indexOf(group) === groupedItems.length - 1}
+                        aria-label={`Descendre le rayon ${group.label}`}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  )}
+                </li>
                 {group.items.map((item) => (
                   <li
                     key={item.id}

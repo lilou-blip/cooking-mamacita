@@ -11,7 +11,7 @@ import {
   type RecipeFull,
   type RecipeIngredientView,
 } from "../lib/db";
-import { estimateNutrition, estimatePriceRange } from "../lib/assistant";
+import { estimateNutrition, estimatePriceRange, suggestIngredientSubstitutes, type SubstitutionSuggestion } from "../lib/assistant";
 import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
 import "./BookPage.css";
@@ -51,6 +51,9 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [nutrition, setNutrition] = useState<NutritionEstimate | null>(recipe.nutrition_estimate);
   const [estimatingNutrition, setEstimatingNutrition] = useState(false);
   const [nutritionError, setNutritionError] = useState<string | null>(null);
+  const [substitutions, setSubstitutions] = useState<Record<number, SubstitutionSuggestion[]>>({});
+  const [loadingSubForId, setLoadingSubForId] = useState<number | null>(null);
+  const [subError, setSubError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,6 +154,20 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
     } catch (err) {
       setIsFavorite(!next);
       setFavoriteError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleSubstitute(ing: RecipeIngredientView) {
+    setLoadingSubForId(ing.id);
+    setSubError(null);
+    try {
+      const others = recipe.ingredients.filter((i) => i.id !== ing.id).map((i) => i.ingredient_name);
+      const result = await suggestIngredientSubstitutes(ing.ingredient_name, recipe.title, others);
+      setSubstitutions((prev) => ({ ...prev, [ing.id]: result }));
+    } catch (err) {
+      setSubError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingSubForId(null);
     }
   }
 
@@ -296,11 +313,38 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
             {listError && <p className="book-page__missing-error">{listError}</p>}
           </div>
         )}
+        {subError && <p className="form-error">{subError}</p>}
         <ul>
           {recipe.ingredients.map((ing) => (
             <li key={ing.id}>
-              <span className="book-page__ingredient-qty">{formatQuantity(ing, scale)}</span>
-              <span>{ing.ingredient_name}</span>
+              <div className="book-page__ingredient-row">
+                <span className="book-page__ingredient-qty">{formatQuantity(ing, scale)}</span>
+                <span>{ing.ingredient_name}</span>
+                <button
+                  type="button"
+                  className="book-page__substitute-btn"
+                  onClick={() => handleSubstitute(ing)}
+                  disabled={loadingSubForId === ing.id}
+                  title="Je n'ai pas cet ingrédient"
+                  aria-label={`Substituts pour ${ing.ingredient_name}`}
+                >
+                  {loadingSubForId === ing.id ? "..." : "🔄"}
+                </button>
+              </div>
+              {substitutions[ing.id] && (
+                <ul className="book-page__substitute-list">
+                  {substitutions[ing.id].length === 0 ? (
+                    <li className="book-page__substitute-empty">Mamacita n'a pas trouvé de bonne alternative.</li>
+                  ) : (
+                    substitutions[ing.id].map((s, i) => (
+                      <li key={i}>
+                        <strong>{s.substitute}</strong>
+                        {s.note && ` — ${s.note}`}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

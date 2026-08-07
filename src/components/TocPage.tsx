@@ -12,11 +12,21 @@ interface TocPageProps {
   onSelect: (id: number) => void;
   onAddNew: () => void;
   onImport: () => void;
+  onExportPdf: () => void;
   onDuplicate: (id: number) => void | Promise<void>;
   onToggleFavorite: (id: number, isFavorite: boolean) => void | Promise<void>;
 }
 
-export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onDuplicate, onToggleFavorite }: TocPageProps) {
+export function TocPage({
+  recipes,
+  selectedId,
+  onSelect,
+  onAddNew,
+  onImport,
+  onExportPdf,
+  onDuplicate,
+  onToggleFavorite,
+}: TocPageProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
@@ -229,6 +239,11 @@ export function TocPage({ recipes, selectedId, onSelect, onAddNew, onImport, onD
         <button type="button" className="form-cancel" onClick={onImport}>
           ✨ Importer avec Mamacita
         </button>
+        {recipes.length > 0 && (
+          <button type="button" className="form-cancel" onClick={onExportPdf}>
+            📄 Exporter en PDF
+          </button>
+        )}
       </div>
     </div>
   );

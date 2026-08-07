@@ -276,6 +276,48 @@ ${recipeList}`;
   return suggestions;
 }
 
+export interface SubstitutionSuggestion {
+  substitute: string;
+  note: string;
+}
+
+/** Propose 2-3 alternatives réalistes à un ingrédient manquant ("J'ai pas cet ingrédient !"), en tenant
+ * compte du reste de la recette pour rester cohérent, et en priorité ce qui est déjà au garde-manger. */
+export async function suggestIngredientSubstitutes(
+  ingredientName: string,
+  recipeTitle: string,
+  otherIngredients: string[],
+): Promise<SubstitutionSuggestion[]> {
+  const pantryItems = await listPantryItems();
+  const pantryNames = pantryItems.map((i) => i.ingredient_name);
+
+  const systemPrompt = `Tu proposes des substituts réalistes pour un ingrédient manquant dans une recette de cuisine familiale.
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après : {"substitutes": [{"substitute": string, "note": string}]}
+Propose 2 à 3 alternatives concrètes et courantes (pas exotiques), cohérentes avec le reste de la recette fournie.
+"note" est une précision courte (quantité équivalente si elle diffère, léger changement de goût/texture à prévoir...).
+Si l'utilisateur a déjà l'un de ces substituts dans son garde-manger (liste fournie), mentionne-le en premier.`;
+
+  const userMessage = `Recette : ${recipeTitle}
+Ingrédient à remplacer : ${ingredientName}
+Autres ingrédients de la recette : ${otherIngredients.join(", ") || "aucun"}
+Déjà au garde-manger : ${pantryNames.join(", ") || "rien de particulier"}`;
+
+  const parsed = await callAiJson(systemPrompt, userMessage, 300);
+  const obj = (parsed ?? {}) as Record<string, unknown>;
+  const raw = Array.isArray(obj.substitutes) ? obj.substitutes : [];
+
+  return raw
+    .filter(
+      (s): s is Record<string, unknown> =>
+        !!s && typeof s === "object" && typeof (s as Record<string, unknown>).substitute === "string" && (s as Record<string, unknown>).substitute !== "",
+    )
+    .map((s) => ({
+      substitute: String(s.substitute).trim(),
+      note: typeof s.note === "string" ? s.note.trim() : "",
+    }))
+    .filter((s) => s.substitute.length > 0);
+}
+
 export interface BatchCookingSelection {
   meal_slot: MealSlot;
   recipe_id: number;
@@ -475,16 +517,27 @@ export interface ReceiptItem {
   name: string;
   quantity: number | null;
   price: number | null;
+  category: string | null;
+  suggested_storage: string | null;
+  shelf_life_days: number | null;
 }
 
-/** Envoie la photo d'un ticket de caisse à l'IA (Claude sait lire une image directement) pour en extraire les articles achetés. */
-export async function scanReceipt(imageBase64: string, mediaType: string): Promise<ReceiptItem[]> {
+/** Envoie la photo (ou l'image rendue d'un PDF) d'un ticket de caisse à l'IA (Claude sait lire une image
+ * directement) pour en extraire les articles achetés, avec une suggestion d'emplacement et de durée de
+ * conservation par article pour préremplir l'écran de validation plutôt que de tout laisser vide. */
+export async function scanReceipt(imageBase64: string, mediaType: string, storageUnitNames: string[] = []): Promise<ReceiptItem[]> {
+  const categoryList = INGREDIENT_CATEGORIES.map((c) => c.value).join(", ");
+  const storageList = storageUnitNames.length > 0 ? storageUnitNames.join(", ") : "aucun (n'en propose pas)";
+
   const systemPrompt = `Tu lis une photo de ticket de caisse de supermarché et tu en extrais les articles achetés.
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant/après, respectant exactement ce schéma :
-{"items": [{"name": string, "quantity": nombre ou null, "price": nombre ou null}]}
+{"items": [{"name": string, "quantity": nombre ou null, "price": nombre ou null, "category": string ou null, "suggested_storage": string ou null, "shelf_life_days": nombre ou null}]}
 
 "name" est le nom du produit en français, simplifié et compréhensible pour quelqu'un qui range ses courses (pas le libellé de caisse abrégé, ex: "PDT ECOSSE 2KG" devient "pommes de terre").
 "price" est le prix payé pour la ligne, en euros.
+"category" : la catégorie la plus proche parmi ces valeurs EXACTES, ou null si aucune ne convient : ${categoryList}
+"suggested_storage" : le nom EXACT de l'emplacement le plus adapté parmi ceux-ci : ${storageList} — ou null si aucun ne convient (ex: un emplacement dont le nom contient "congél" pour un surgelé, "frigo"/"frais" pour un produit frais, un placard/une cave pour de l'épicerie sèche).
+"shelf_life_days" : estimation réaliste du nombre de jours avant qu'il faille consommer ce produit une fois acheté (ex: 3 pour de la viande fraîche, 300 pour une conserve, 7 pour un yaourt, 5 pour un légume frais) — null si tu ne peux pas estimer raisonnablement.
 Ignore les lignes qui ne sont pas des articles achetés (total, sous-total, remises, moyen de paiement, numéro de ticket, TVA, adresse du magasin...).
 Si la photo est illisible ou n'est manifestement pas un ticket de caisse, réponds {"items": []}.`;
 
@@ -492,7 +545,7 @@ Si la photo est illisible ou n'est manifestement pas un ticket de caisse, répon
     body: {
       systemPrompt,
       userMessage: "Voici la photo du ticket de caisse.",
-      numPredict: 1500,
+      numPredict: 1800,
       image: imageBase64,
       mediaType,
     },
@@ -508,6 +561,8 @@ Si la photo est illisible ou n'est manifestement pas un ticket de caisse, répon
 
   const obj = (parsed ?? {}) as Record<string, unknown>;
   const items = Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]) : [];
+  const validCategories = new Set(INGREDIENT_CATEGORIES.map((c) => c.value));
+  const validStorage = new Set(storageUnitNames);
 
   return items
     .filter((i) => i && typeof i === "object" && typeof i.name === "string" && i.name.trim())
@@ -515,6 +570,9 @@ Si la photo est illisible ou n'est manifestement pas un ticket de caisse, répon
       name: String(i.name).trim(),
       quantity: typeof i.quantity === "number" && i.quantity > 0 ? i.quantity : null,
       price: typeof i.price === "number" && i.price >= 0 ? i.price : null,
+      category: typeof i.category === "string" && validCategories.has(i.category) ? i.category : null,
+      suggested_storage: typeof i.suggested_storage === "string" && validStorage.has(i.suggested_storage) ? i.suggested_storage : null,
+      shelf_life_days: typeof i.shelf_life_days === "number" && i.shelf_life_days > 0 ? Math.round(i.shelf_life_days) : null,
     }));
 }
 

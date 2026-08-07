@@ -67,11 +67,25 @@
 
 .receipt-scanner__item {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--color-cream);
+  border-radius: var(--radius-card);
+  padding: 8px 10px;
+}
+.receipt-scanner__item-main {
+  display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--color-cream);
-  border-radius: var(--radius-tag);
-  padding: 8px 10px;
+}
+.receipt-scanner__item-details {
+  display: flex;
+  gap: 8px;
+  padding-left: 26px;
+}
+.receipt-scanner__item-details select,
+.receipt-scanner__item-details input {
+  font-size: 0.8rem;
 }
 
 .receipt-scanner__name {
@@ -83,6 +97,13 @@
   font-size: 0.85rem;
   color: var(--color-ink-soft);
   white-space: nowrap;
+}
+
+.receipt-scanner__source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .receipt-scanner__actions {
