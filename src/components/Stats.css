@@ -19,11 +19,14 @@
 }
 
 .stats__profile-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-  border-radius: 50%;
   opacity: 0.55;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
@@ -33,6 +36,18 @@
 .stats__profile-filter--active {
   opacity: 1;
   transform: translateY(-3px);
+}
+.stats__profile-filter-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--color-ink-soft);
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stats__profile-filter--active .stats__profile-filter-label {
+  color: var(--color-groseille-deep);
 }
 
 .stats__profile-avatar {

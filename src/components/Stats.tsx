@@ -180,13 +180,13 @@ export function Stats({ onBack }: StatsProps) {
           <button
             className={`stats__profile-filter${selectedProfileId === null ? " stats__profile-filter--active" : ""}`}
             onClick={() => selectProfile(null)}
-            title="Tous"
           >
             {getAvatarUrl("ensemble") ? (
-              <img className="stats__profile-avatar" src={getAvatarUrl("ensemble")} alt="Tous" />
+              <img className="stats__profile-avatar" src={getAvatarUrl("ensemble")} alt="" />
             ) : (
               <span className="stats__profile-avatar stats__profile-avatar--all">Tous</span>
             )}
+            <span className="stats__profile-filter-label">Tous</span>
           </button>
         )}
         {profiles.map((p) => {
@@ -197,13 +197,13 @@ export function Stats({ onBack }: StatsProps) {
               className={`stats__profile-filter${selectedProfileId === p.id ? " stats__profile-filter--active" : ""}`}
               onClick={() => selectProfile(p.id)}
               style={{ "--profile-color": p.color } as CSSProperties}
-              title={p.name}
             >
               {avatarUrl ? (
-                <img className="stats__profile-avatar" src={avatarUrl} alt={p.name} />
+                <img className="stats__profile-avatar" src={avatarUrl} alt="" />
               ) : (
                 <span className="stats__profile-avatar stats__profile-avatar--dot">{p.name.charAt(0).toUpperCase()}</span>
               )}
+              <span className="stats__profile-filter-label">{p.name}</span>
             </button>
           );
         })}

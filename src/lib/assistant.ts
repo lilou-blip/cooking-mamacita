@@ -145,7 +145,9 @@ export async function fetchRecipeTextFromUrl(url: string): Promise<string> {
 export async function structureRecipeFromText(rawText: string): Promise<RecipeDraft> {
   const [tags, units] = await Promise.all([listAllTags(), listUnits()]);
   const systemPrompt = buildSystemPrompt(tags, units);
-  const parsed = await callAiJson(systemPrompt, rawText, 700);
+  // 700 s'est révélé trop court et tronquait le JSON (donc invalide) pour une recette détaillée à
+  // plusieurs composants (ex: un plat + sa sauce, chacun avec ses propres ingrédients et étapes).
+  const parsed = await callAiJson(systemPrompt, rawText, 1400);
   return normalizeDraft(parsed, tags, units);
 }
 
@@ -160,7 +162,7 @@ La recette t'est donnée en photo (manuscrite, page de livre de cuisine, capture
     body: {
       systemPrompt,
       userMessage: "Voici la photo de la recette à structurer.",
-      numPredict: 900,
+      numPredict: 1400,
       image: imageBase64,
       mediaType,
     },
@@ -193,7 +195,7 @@ Propose UNE recette simple et classique de cuisine familiale française (le genr
 Choisis SEULEMENT les ingrédients de la liste qui se marient bien ensemble dans un même plat cohérent — tu n'es pas obligé de tous les utiliser, ignore ceux qui ne conviendraient pas à la même recette (par exemple ne mélange pas un ingrédient sucré et un plat salé sauf si c'est un dessert). Complète avec des ingrédients de base courants (sel, poivre, huile, épices, oignon, ail...) si besoin.
 Le résultat doit être un plat crédible que quelqu'un cuisinerait vraiment chez soi, pas une association improbable.`;
 
-  const parsed = await callAiJson(systemPrompt, userMessage, 700);
+  const parsed = await callAiJson(systemPrompt, userMessage, 1400);
   return normalizeDraft(parsed, tags, units);
 }
 
