@@ -9,7 +9,7 @@ interface StepTimerProps {
 }
 
 export function StepTimer({ id, label, seconds }: StepTimerProps) {
-  const { getTimer, startTimer, toggleRunning, resetTimer } = useTimers();
+  const { getTimer, startTimer, toggleRunning, resetTimer, addMinute } = useTimers();
   const timer = getTimer(id);
 
   if (!timer) {
@@ -36,6 +36,9 @@ export function StepTimer({ id, label, seconds }: StepTimerProps) {
       <span className="step-timer__clock">{formatTimer(timer.remainingSeconds)}</span>
       <button type="button" onClick={() => toggleRunning(id)} aria-label={timer.running ? "Pause" : "Reprendre"}>
         {timer.running ? "⏸" : "▶"}
+      </button>
+      <button type="button" onClick={() => addMinute(id)} aria-label="Ajouter 1 minute">
+        +1min
       </button>
       <button type="button" onClick={() => resetTimer(id)} aria-label="Réinitialiser le minuteur">
         ×

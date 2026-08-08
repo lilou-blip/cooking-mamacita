@@ -52,6 +52,7 @@ export function ReceiptScanner({ onDone, onCancel }: ReceiptScannerProps) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [storageUnits, setStorageUnits] = useState<StorageUnit[]>([]);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -101,6 +102,13 @@ export function ReceiptScanner({ onDone, onCancel }: ReceiptScannerProps) {
     }
   }
 
+  // Point d'entrée commun pour un fichier lâché en drag & drop (photo ou PDF, on ne peut pas se fier à un
+  // input file dédié comme sur mobile) : on route selon le type MIME plutôt que de demander à l'utilisateur.
+  function handleIncomingFile(file: File) {
+    if (file.type === "application/pdf") void handlePdfFile(file);
+    else void handleFile(file);
+  }
+
   function toggleIncluded(index: number) {
     setItems((prev) => prev?.map((it, i) => (i === index ? { ...it, included: !it.included } : it)) ?? null);
   }
@@ -144,10 +152,23 @@ export function ReceiptScanner({ onDone, onCancel }: ReceiptScannerProps) {
         <h2>Scanner un ticket de caisse</h2>
 
         {items == null && (
-          <>
+          <div
+            className={`receipt-scanner__dropzone${dragging ? " receipt-scanner__dropzone--active" : ""}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleIncomingFile(file);
+            }}
+          >
             <p className="receipt-scanner__hint">
-              Prends une photo bien cadrée et lisible du ticket, ou importe un PDF (export drive/e-ticket) —
-              Mamacita en extrait automatiquement les articles.
+              Prends une photo bien cadrée et lisible du ticket, importe un PDF (export drive/e-ticket), ou
+              glisse-dépose directement le fichier ici — Mamacita en extrait automatiquement les articles.
             </p>
             <input
               ref={inputRef}
@@ -178,7 +199,7 @@ export function ReceiptScanner({ onDone, onCancel }: ReceiptScannerProps) {
                 📄 Importer un PDF
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {error && <p className="form-error">{error}</p>}

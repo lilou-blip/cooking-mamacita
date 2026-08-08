@@ -144,11 +144,9 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
         <button className="pantry-room__action" onClick={handleVideFrigo} disabled={videFrigoLoading}>
           {videFrigoLoading ? "Mamacita réfléchit... (10-30s)" : "🥕 Idée anti-gaspi"}
         </button>
-        {isMobile && (
-          <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>
-            📸 Scanner un ticket
-          </button>
-        )}
+        <button className="pantry-room__action" onClick={() => setShowReceiptScanner(true)}>
+          {isMobile ? "📸 Scanner un ticket" : "🧾 Scanner un ticket"}
+        </button>
       </div>
       {videFrigoError && <p className="pantry-room__vide-frigo-error">{videFrigoError}</p>}
 

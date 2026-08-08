@@ -15,6 +15,7 @@ import {
 import { estimateListTotalByRetailer, estimatePriceRange, type RetailerTotal } from "../lib/assistant";
 import { INGREDIENT_CATEGORIES } from "../lib/constants";
 import { getCategoryOrder, saveCategoryOrder, swapCategories } from "../lib/shoppingCategoryOrder";
+import { useWakeLock } from "../lib/useWakeLock";
 import { IngredientAutocomplete } from "./IngredientAutocomplete";
 import { SprigDoodle } from "./SprigDoodle";
 import { LoadingScreen } from "./LoadingScreen";
@@ -48,7 +49,12 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
   const [copied, setCopied] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState<string[]>(() => getCategoryOrder());
   const [reordering, setReordering] = useState(false);
+  const [storeMode, setStoreMode] = useState(false);
   const autoEstimated = useRef(false);
+
+  // Mode magasin actif : l'écran ne doit pas se verrouiller toutes les 30s pendant les courses, caddie
+  // dans une main et téléphone dans l'autre.
+  useWakeLock(storeMode);
 
   const refresh = useCallback(async () => {
     const fresh = await getShoppingListById(id);
@@ -274,6 +280,86 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
     });
   }
 
+  // Extrait en fonction pour être réutilisé à l'identique en mode magasin, où les articles cochés migrent
+  // dans une section "Dans le panier" séparée plutôt que de juste griser sur place.
+  function renderItemRow(item: ShoppingListItem) {
+    return (
+      <li
+        key={item.id}
+        className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--expanded" : ""}`}
+      >
+        <div className="shopping-list__item-main">
+          <input
+            type="checkbox"
+            checked={item.checked}
+            onChange={(e) => toggleChecked(item.id, e.target.checked)}
+            aria-label={`${item.ingredient_name} acheté`}
+          />
+          <span className="shopping-list__qty">
+            {item.quantity != null
+              ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
+              : ""}
+          </span>
+          <span className="shopping-list__name">{item.ingredient_name}</span>
+          {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
+        </div>
+        <div className="shopping-list__item-controls">
+          {item.price == null && !estimatingAll && (
+            <button
+              type="button"
+              className="shopping-list__estimate"
+              onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
+              disabled={estimatingId === item.id || estimatingAll}
+            >
+              {estimatingId === item.id ? "..." : "💡 Estimer"}
+            </button>
+          )}
+          {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
+          <input
+            key={`${item.id}-${item.price ?? "empty"}`}
+            className="shopping-list__price"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="€"
+            defaultValue={item.price ?? ""}
+            onBlur={(e) => setPrice(item.id, e.target.value)}
+            aria-label={`Prix de ${item.ingredient_name}`}
+          />
+          <button type="button" className="shopping-list__delete" onClick={() => handleDeleteItem(item.id)} aria-label="Retirer">
+            ×
+          </button>
+        </div>
+
+        {transferringId === item.id && (
+          <div className="shopping-list__transfer">
+            <span className="shopping-list__transfer-label">Ranger dans :</span>
+            <input
+              type="date"
+              className="shopping-list__transfer-expiry"
+              value={transferExpiry}
+              onChange={(e) => setTransferExpiry(e.target.value)}
+              title="Date de péremption (optionnel)"
+            />
+            {storageUnits.map((u) => (
+              <button key={u.id} type="button" onClick={() => handleTransfer(item, u.id)}>
+                {u.name}
+              </button>
+            ))}
+            <button type="button" onClick={() => handleTransfer(item, null)}>
+              Sans emplacement
+            </button>
+            <button type="button" className="shopping-list__transfer-skip" onClick={() => setTransferringId(null)}>
+              Plus tard
+            </button>
+          </div>
+        )}
+      </li>
+    );
+  }
+
+  const checkedItems = list.items.filter((item) => item.checked);
+
   return (
     <div className="shopping-list">
       <button className="book-nav__back" onClick={onBack}>
@@ -288,10 +374,17 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
 
         {list.items.length > 0 && (
           <div className="shopping-list__toolbar">
+            <button
+              type="button"
+              className={`shopping-list__export${storeMode ? " shopping-list__export--active" : ""}`}
+              onClick={() => setStoreMode((v) => !v)}
+            >
+              {storeMode ? "✓ Mode magasin actif" : "🛒 Mode magasin"}
+            </button>
             <button type="button" className="shopping-list__export" onClick={handleExport}>
               {copied ? "✓ Copié !" : "📋 Copier la liste"}
             </button>
-            {groupedItems.length > 1 && (
+            {groupedItems.length > 1 && !storeMode && (
               <button type="button" className="shopping-list__export" onClick={() => setReordering((r) => !r)}>
                 {reordering ? "✓ Terminé" : "↕️ Réordonner les rayons"}
               </button>
@@ -304,117 +397,49 @@ export function ShoppingList({ id, onBack, backLabel = "← Menu" }: ShoppingLis
         {list.items.length === 0 ? (
           <p className="shopping-list__empty">Tout est déjà dans le garde-manger, rien à acheter !</p>
         ) : (
-          <ul className="shopping-list__items">
-            {groupedItems.map((group) => (
-              <Fragment key={group.category}>
-                <li className="shopping-list__category-header">
-                  <span>{group.label}</span>
-                  {reordering && (
-                    <span className="shopping-list__category-reorder">
-                      <button
-                        type="button"
-                        onClick={() => moveCategory(group.category, -1)}
-                        disabled={groupedItems.indexOf(group) === 0}
-                        aria-label={`Monter le rayon ${group.label}`}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveCategory(group.category, 1)}
-                        disabled={groupedItems.indexOf(group) === groupedItems.length - 1}
-                        aria-label={`Descendre le rayon ${group.label}`}
-                      >
-                        ▼
-                      </button>
-                    </span>
-                  )}
-                </li>
-                {group.items.map((item) => (
-                  <li
-                    key={item.id}
-                    className={`shopping-list__item${item.checked ? " shopping-list__item--checked" : ""}${transferringId === item.id ? " shopping-list__item--expanded" : ""}`}
-                  >
-                    <div className="shopping-list__item-main">
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(e) => toggleChecked(item.id, e.target.checked)}
-                        aria-label={`${item.ingredient_name} acheté`}
-                      />
-                      <span className="shopping-list__qty">
-                        {item.quantity != null
-                          ? `${Math.round(item.quantity * 100) / 100}${item.unit_abbreviation ? " " + item.unit_abbreviation : ""}`
-                          : ""}
-                      </span>
-                      <span className="shopping-list__name">{item.ingredient_name}</span>
-                      {item.is_suggested && <span className="shopping-list__suggested-badge">suggéré</span>}
-                    </div>
-                    <div className="shopping-list__item-controls">
-                      {item.price == null && !estimatingAll && (
-                        <button
-                          type="button"
-                          className="shopping-list__estimate"
-                          onClick={() => handleEstimate(item.id, item.ingredient_name, item.quantity, item.unit_abbreviation)}
-                          disabled={estimatingId === item.id || estimatingAll}
-                        >
-                          {estimatingId === item.id ? "..." : "💡 Estimer"}
-                        </button>
-                      )}
-                      {item.price_is_estimate && <span className="shopping-list__estimate-badge">estimé</span>}
-                      <input
-                        key={`${item.id}-${item.price ?? "empty"}`}
-                        className="shopping-list__price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="€"
-                        defaultValue={item.price ?? ""}
-                        onBlur={(e) => setPrice(item.id, e.target.value)}
-                        aria-label={`Prix de ${item.ingredient_name}`}
-                      />
-                      <button
-                        type="button"
-                        className="shopping-list__delete"
-                        onClick={() => handleDeleteItem(item.id)}
-                        aria-label="Retirer"
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    {transferringId === item.id && (
-                      <div className="shopping-list__transfer">
-                        <span className="shopping-list__transfer-label">Ranger dans :</span>
-                        <input
-                          type="date"
-                          className="shopping-list__transfer-expiry"
-                          value={transferExpiry}
-                          onChange={(e) => setTransferExpiry(e.target.value)}
-                          title="Date de péremption (optionnel)"
-                        />
-                        {storageUnits.map((u) => (
-                          <button key={u.id} type="button" onClick={() => handleTransfer(item, u.id)}>
-                            {u.name}
+          <>
+            <ul className={`shopping-list__items${storeMode ? " shopping-list__items--store" : ""}`}>
+              {groupedItems.map((group) => {
+                const groupItems = storeMode ? group.items.filter((item) => !item.checked) : group.items;
+                if (storeMode && groupItems.length === 0) return null;
+                return (
+                  <Fragment key={group.category}>
+                    <li className="shopping-list__category-header">
+                      <span>{group.label}</span>
+                      {reordering && (
+                        <span className="shopping-list__category-reorder">
+                          <button
+                            type="button"
+                            onClick={() => moveCategory(group.category, -1)}
+                            disabled={groupedItems.indexOf(group) === 0}
+                            aria-label={`Monter le rayon ${group.label}`}
+                          >
+                            ▲
                           </button>
-                        ))}
-                        <button type="button" onClick={() => handleTransfer(item, null)}>
-                          Sans emplacement
-                        </button>
-                        <button
-                          type="button"
-                          className="shopping-list__transfer-skip"
-                          onClick={() => setTransferringId(null)}
-                        >
-                          Plus tard
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </Fragment>
-            ))}
-          </ul>
+                          <button
+                            type="button"
+                            onClick={() => moveCategory(group.category, 1)}
+                            disabled={groupedItems.indexOf(group) === groupedItems.length - 1}
+                            aria-label={`Descendre le rayon ${group.label}`}
+                          >
+                            ▼
+                          </button>
+                        </span>
+                      )}
+                    </li>
+                    {groupItems.map(renderItemRow)}
+                  </Fragment>
+                );
+              })}
+            </ul>
+
+            {storeMode && checkedItems.length > 0 && (
+              <div className="shopping-list__basket">
+                <h2 className="shopping-list__basket-title">🛒 Dans le panier ({checkedItems.length})</h2>
+                <ul className="shopping-list__items shopping-list__items--store">{checkedItems.map(renderItemRow)}</ul>
+              </div>
+            )}
+          </>
         )}
 
         <div className="shopping-list__add">

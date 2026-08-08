@@ -99,6 +99,17 @@
   white-space: nowrap;
 }
 
+.receipt-scanner__dropzone {
+  border: 2px dashed var(--color-blush-deep);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.receipt-scanner__dropzone--active {
+  border-color: var(--color-groseille);
+  background: var(--color-blush);
+}
+
 .receipt-scanner__source-actions {
   display: flex;
   flex-wrap: wrap;

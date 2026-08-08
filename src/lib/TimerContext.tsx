@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { showNotification } from "./notifications";
+import { alertTimerDone } from "./timerAlert";
 import { TimerContext, type TimerContextValue, type TimerEntry } from "./timerTypes";
 
 /**
@@ -19,7 +20,10 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           if (t.running && !t.done) {
             const remaining = Math.max(0, t.remainingSeconds - 1);
             const done = remaining <= 0;
-            if (done) void showNotification(`⏱ ${t.label}`, { body: "C'est prêt !", tag: `timer-${id}` });
+            if (done) {
+              void showNotification(`⏱ ${t.label}`, { body: "C'est prêt !", tag: `timer-${id}` });
+              alertTimerDone();
+            }
             next[id] = { ...t, remainingSeconds: remaining, running: !done, done };
             changed = true;
           } else {
@@ -57,6 +61,18 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           const next = { ...prev };
           delete next[id];
           return next;
+        });
+      },
+      // "+1 minute" : utile pour rallonger sans tout recalculer, y compris pour redémarrer un minuteur déjà
+      // terminé ("ah zut, il en faut encore un peu") plutôt que d'avoir à le relancer depuis zéro.
+      addMinute: (id) => {
+        setTimers((prev) => {
+          const t = prev[id];
+          if (!t) return prev;
+          return {
+            ...prev,
+            [id]: { ...t, remainingSeconds: t.remainingSeconds + 60, totalSeconds: t.totalSeconds + 60, running: true, done: false },
+          };
         });
       },
     }),

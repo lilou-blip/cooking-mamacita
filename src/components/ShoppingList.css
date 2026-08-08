@@ -133,6 +133,49 @@
 .shopping-list__item--checked {
   opacity: 0.55;
 }
+
+/* Mode magasin : lignes plus hautes et cases à cocher plus grandes pour limiter les mistaps au pouce,
+   caddie dans l'autre main — le fond "papier ligné" (calé sur 44px) est retiré car il ne correspond plus
+   à la hauteur des lignes. */
+.shopping-list__items--store {
+  background: none;
+}
+.shopping-list__items--store .shopping-list__item {
+  height: auto;
+  min-height: 62px;
+  padding: 12px 4px;
+}
+.shopping-list__items--store .shopping-list__item input[type="checkbox"] {
+  width: 30px;
+  height: 30px;
+}
+.shopping-list__items--store .shopping-list__name {
+  font-size: 1.05rem;
+}
+.shopping-list__items--store .shopping-list__category-header {
+  height: auto;
+  padding: 12px 2px 6px;
+}
+
+.shopping-list__basket {
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px dashed var(--color-blush-deep);
+}
+.shopping-list__basket-title {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  color: var(--color-ink-soft);
+  margin: 0 0 6px;
+}
+
+.shopping-list__export--active {
+  background: var(--color-groseille);
+  color: var(--color-white);
+  border-color: var(--color-groseille-deep);
+  border-style: solid;
+}
 .shopping-list__item--transferring,
 .shopping-list__item--expanded {
   height: auto;

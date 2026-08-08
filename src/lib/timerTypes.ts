@@ -15,6 +15,7 @@ export interface TimerContextValue {
   startTimer: (id: string, label: string, seconds: number) => void;
   toggleRunning: (id: string) => void;
   resetTimer: (id: string) => void;
+  addMinute: (id: string) => void;
 }
 
 export const TimerContext = createContext<TimerContextValue | null>(null);
