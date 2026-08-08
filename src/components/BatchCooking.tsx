@@ -22,7 +22,8 @@ import {
 import { estimatePriceRange, suggestBatchCookingPlan, suggestBatchCookingSelection } from "../lib/assistant";
 import { pickCurrentWeekMenu } from "../lib/weekMenu";
 import { MEAL_SLOTS } from "../lib/constants";
-import { CookMode } from "./CookMode";
+import type { MatchableIngredient } from "../lib/stepIngredients";
+import { CookMode, type CookModeStep } from "./CookMode";
 import { LoadingScreen } from "./LoadingScreen";
 import "./PantryForm.css";
 import "./BatchCooking.css";
@@ -82,7 +83,7 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(null);
   const [recipeDetails, setRecipeDetails] = useState<Record<number, RecipeFull>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
-  const [cookModeRecipe, setCookModeRecipe] = useState<RecipeFull | null>(null);
+  const [cookModeOpen, setCookModeOpen] = useState(false);
 
   const [ingredientPreview, setIngredientPreview] = useState<BatchIngredientPreviewRow[] | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -292,11 +293,6 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
     await ensureRecipeDetail(recipeId);
   }
 
-  async function openCookMode(recipeId: number) {
-    const detail = await ensureRecipeDetail(recipeId);
-    if (detail) setCookModeRecipe(detail);
-  }
-
   async function handlePreviewIngredients() {
     setLoadingPreview(true);
     setPreviewError(null);
@@ -459,6 +455,18 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
   const slotLabels = MEAL_SLOTS.filter((s) => selectedSlots.has(s.value)).map((s) => s.label);
   const headcount = getHeadcount();
   const days = getDurationDays();
+  // Le mode cuisine du batch suit le PLAN COMBINÉ (déjà optimisé pour cuisiner plusieurs recettes à la
+  // suite), pas chaque recette séparément — sinon on perdrait tout l'intérêt du plan (four/plaques
+  // mutualisés, préparations regroupées...). Les ingrédients viennent de toutes les recettes actives, pour
+  // que le rappel contextuel par étape fonctionne quelle que soit la recette évoquée dans cette étape.
+  const cookModeSteps: CookModeStep[] = (plan ?? []).map((instruction, i) => ({
+    id: `batch-plan-step-${i}`,
+    stepNumber: i + 1,
+    instruction,
+  }));
+  const cookModeIngredients: MatchableIngredient[] = entries
+    .filter((e) => (Number(e.totalQuantity) || 0) > 0)
+    .flatMap((e) => recipeDetails[e.recipeId]?.ingredients ?? []);
   const backLabel =
     step === "slots" ? "← Garde-manger" : step === "recipes" ? "← Créneaux" : step === "plan" ? "← Recettes" : "← Plan";
 
@@ -608,18 +616,13 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                       </button>
                     </div>
 
-                    <div className="batch-cooking__entry-links">
-                      <button
-                        type="button"
-                        className="batch-cooking__entry-toggle"
-                        onClick={() => toggleExpand(entry.recipeId)}
-                      >
-                        {isExpanded ? "▾ Masquer la recette" : "▸ Voir ingrédients & étapes"}
-                      </button>
-                      <button type="button" className="batch-cooking__entry-toggle" onClick={() => openCookMode(entry.recipeId)}>
-                        👩‍🍳 Mode cuisine
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="batch-cooking__entry-toggle"
+                      onClick={() => toggleExpand(entry.recipeId)}
+                    >
+                      {isExpanded ? "▾ Masquer la recette" : "▸ Voir ingrédients & étapes"}
+                    </button>
 
                     {isExpanded && (
                       <div className="batch-cooking__entry-detail">
@@ -795,6 +798,11 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                   ))}
                 </ol>
               )}
+              {plan && plan.length > 0 && (
+                <button type="button" className="form-submit batch-cooking__cook-mode-btn" onClick={() => setCookModeOpen(true)}>
+                  👩‍🍳 Suivre en mode cuisine
+                </button>
+              )}
             </section>
 
             <div className="batch-cooking__actions">
@@ -932,7 +940,14 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
           </>
         )}
       </div>
-      {cookModeRecipe && <CookMode recipe={cookModeRecipe} onClose={() => setCookModeRecipe(null)} />}
+      {cookModeOpen && (
+        <CookMode
+          title="🍲 Batch cooking"
+          steps={cookModeSteps}
+          ingredients={cookModeIngredients}
+          onClose={() => setCookModeOpen(false)}
+        />
+      )}
     </div>
   );
 }

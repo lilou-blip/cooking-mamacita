@@ -145,7 +145,16 @@ export function RecipeStepsPage({
 
       <SprigDoodle className="book-page__doodle book-page__doodle--br" flip />
 
-      {cookModeOpen && <CookMode recipe={recipe} onClose={() => setCookModeOpen(false)} />}
+      {cookModeOpen && (
+        <CookMode
+          title={recipe.title}
+          steps={[...recipe.steps]
+            .sort((a, b) => a.step_number - b.step_number)
+            .map((s) => ({ id: `step-${recipe.id}-${s.id}`, stepNumber: s.step_number, instruction: s.instruction }))}
+          ingredients={recipe.ingredients}
+          onClose={() => setCookModeOpen(false)}
+        />
+      )}
     </>
   );
 }

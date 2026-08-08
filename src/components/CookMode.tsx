@@ -1,23 +1,31 @@
 import { useEffect, useRef, useState, type TouchEvent } from "react";
-import type { RecipeFull } from "../lib/db";
 import { formatQuantityPrefix } from "../lib/formatQuantity";
 import { extractDurationSeconds } from "../lib/stepTimer";
-import { matchIngredientsInStep } from "../lib/stepIngredients";
+import { matchIngredientsInStep, type MatchableIngredient } from "../lib/stepIngredients";
 import { useWakeLock } from "../lib/useWakeLock";
 import { StepTimer } from "./StepTimer";
 import "./CookMode.css";
 
+export interface CookModeStep {
+  id: string;
+  stepNumber: number;
+  instruction: string;
+}
+
 interface CookModeProps {
-  recipe: RecipeFull;
+  title: string;
+  steps: CookModeStep[];
+  ingredients: MatchableIngredient[];
   onClose: () => void;
 }
 
 /** Assistant plein écran pour cuisiner pas-à-pas : une étape à la fois en très gros, écran qui ne s'éteint
  * pas, rappel des ingrédients concernés, lecture vocale et minuteur — pensé pour être utilisable mains
- * sales/mouillées, accessible depuis le carnet, le batch cooking et une recette anti-gaspi (une fois
- * enregistrée, elle passe par la même fiche recette que les autres). */
-export function CookMode({ recipe, onClose }: CookModeProps) {
-  const steps = [...recipe.steps].sort((a, b) => a.step_number - b.step_number);
+ * sales/mouillées. Générique sur la liste d'étapes/ingrédients plutôt que liée à une seule RecipeFull : sert
+ * aussi bien une recette du carnet (une fiche) qu'une séance de batch cooking (le plan combiné de plusieurs
+ * recettes, sur lequel suivre chaque recette séparément n'aurait pas de sens). */
+export function CookMode({ title, steps: stepsProp, ingredients, onClose }: CookModeProps) {
+  const steps = [...stepsProp].sort((a, b) => a.stepNumber - b.stepNumber);
   const [index, setIndex] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -26,7 +34,7 @@ export function CookMode({ recipe, onClose }: CookModeProps) {
 
   const step = steps[index];
   const duration = step ? extractDurationSeconds(step.instruction) : null;
-  const matchedIngredients = step ? matchIngredientsInStep(step.instruction, recipe.ingredients) : [];
+  const matchedIngredients = step ? matchIngredientsInStep(step.instruction, ingredients) : [];
 
   function stopSpeaking() {
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -97,7 +105,7 @@ export function CookMode({ recipe, onClose }: CookModeProps) {
         <button type="button" className="cook-mode__close" onClick={close} aria-label="Fermer le mode cuisine">
           ×
         </button>
-        <p className="cook-mode__empty">Cette recette n'a pas d'étapes renseignées.</p>
+        <p className="cook-mode__empty">Pas d'étapes à suivre pour l'instant.</p>
       </div>
     );
   }
@@ -107,7 +115,7 @@ export function CookMode({ recipe, onClose }: CookModeProps) {
   return (
     <div className="cook-mode" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="cook-mode__header">
-        <span className="cook-mode__title">{recipe.title}</span>
+        <span className="cook-mode__title">{title}</span>
         <button type="button" className="cook-mode__close" onClick={close} aria-label="Fermer le mode cuisine">
           ×
         </button>
@@ -141,9 +149,7 @@ export function CookMode({ recipe, onClose }: CookModeProps) {
           <button type="button" className="cook-mode__speak" onClick={toggleSpeak}>
             {speaking ? "⏹ Arrêter la lecture" : "🔊 Lire l'étape"}
           </button>
-          {duration != null && (
-            <StepTimer id={`step-${recipe.id}-${step.id}`} label={`${recipe.title} — étape ${step.step_number}`} seconds={duration} />
-          )}
+          {duration != null && <StepTimer id={step.id} label={`${title} — étape ${step.stepNumber}`} seconds={duration} />}
         </div>
       </div>
 

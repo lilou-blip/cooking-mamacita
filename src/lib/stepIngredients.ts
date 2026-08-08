@@ -1,6 +1,14 @@
-import type { RecipeIngredientView } from "./db";
-
 const FILLER_WORDS = new Set(["de", "du", "des", "d", "la", "le", "les", "au", "aux", "en", "a", "et", "un", "une", "l"]);
+
+/** Sous-ensemble de RecipeIngredientView suffisant pour le rappel contextuel — permet de réutiliser la même
+ * fonction pour une recette seule (ingrédients tels quels) et pour un plan de batch cooking combinant
+ * plusieurs recettes (liste d'ingrédients agrégée depuis plusieurs fiches à la volée). */
+export interface MatchableIngredient {
+  id: number | string;
+  ingredient_name: string;
+  quantity: number | null;
+  unit_abbreviation: string | null;
+}
 
 function normalize(s: string): string {
   return s
@@ -21,7 +29,7 @@ function significantWords(name: string): string[] {
  * y apparaît) — un rappel contextuel simple sans appel IA ni changement de schéma, pour ne pas avoir à
  * remonter en haut de la recette pendant qu'on cuisine.
  */
-export function matchIngredientsInStep(instruction: string, ingredients: RecipeIngredientView[]): RecipeIngredientView[] {
+export function matchIngredientsInStep<T extends MatchableIngredient>(instruction: string, ingredients: T[]): T[] {
   const stepWords = new Set(
     normalize(instruction)
       .replace(/[^a-z0-9\s]/g, " ")

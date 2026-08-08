@@ -216,10 +216,6 @@
   flex: 1;
 }
 
-.batch-cooking__entry-links {
-  display: flex;
-  gap: 16px;
-}
 .batch-cooking__entry-toggle {
   display: block;
   background: none;
@@ -375,6 +371,10 @@
 .batch-cooking__plan-step--done span {
   color: var(--color-ink-soft);
   text-decoration: line-through;
+}
+.batch-cooking__cook-mode-btn {
+  display: block;
+  margin: 16px auto 0;
 }
 
 .batch-cooking__actions {
