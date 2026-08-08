@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useAsyncEffect } from "../lib/useAsyncEffect";
-import { getRecipeById, type RecipeCard, type RecipeFull } from "../lib/db";
+import { getRecipeById, type RecipeFull } from "../lib/db";
 import { formatQuantityPrefix } from "../lib/formatQuantity";
 import { LoadingScreen } from "./LoadingScreen";
 import "./RecipeBookExport.css";
 
 interface RecipeBookExportProps {
-  recipes: RecipeCard[];
+  recipes: { id: number }[];
   onClose: () => void;
 }
 
-/** Fiche imprimable de tout le carnet : pas de nouvelle dépendance PDF, on s'appuie sur l'impression
- * native du navigateur (window.print → "Enregistrer en PDF"), avec une feuille de style @media print
- * dédiée pour une mise en page propre, une recette par page. */
+/** Fiche imprimable d'une recette ou de tout le carnet : pas de nouvelle dépendance PDF, on s'appuie sur
+ * l'impression native du navigateur (window.print → "Enregistrer en PDF"), avec une feuille de style
+ * @media print dédiée pour une mise en page propre, une recette par page. */
 export function RecipeBookExport({ recipes, onClose }: RecipeBookExportProps) {
   const [fullRecipes, setFullRecipes] = useState<RecipeFull[]>([]);
 
@@ -21,7 +21,7 @@ export function RecipeBookExport({ recipes, onClose }: RecipeBookExportProps) {
     setFullRecipes(details.filter((r): r is RecipeFull => r != null));
   }, [recipes]);
 
-  if (loading) return <LoadingScreen message="Préparation du carnet à imprimer..." />;
+  if (loading) return <LoadingScreen message="Préparation de l'impression..." />;
 
   return (
     <div className="recipe-book-export">
@@ -37,10 +37,12 @@ export function RecipeBookExport({ recipes, onClose }: RecipeBookExportProps) {
       {error && <p className="form-error">Erreur : {error}</p>}
 
       <div className="recipe-book-export__pages">
-        <section className="recipe-book-export__cover">
-          <h1>Mon carnet de recettes</h1>
-          <p>{fullRecipes.length} recette{fullRecipes.length > 1 ? "s" : ""}</p>
-        </section>
+        {fullRecipes.length > 1 && (
+          <section className="recipe-book-export__cover">
+            <h1>Mon carnet de recettes</h1>
+            <p>{fullRecipes.length} recettes</p>
+          </section>
+        )}
 
         {fullRecipes.map((recipe) => (
           <article key={recipe.id} className="recipe-book-export__recipe">

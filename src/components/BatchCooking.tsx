@@ -25,6 +25,7 @@ import { MEAL_SLOTS } from "../lib/constants";
 import type { MatchableIngredient } from "../lib/stepIngredients";
 import { CookMode, type CookModeStep } from "./CookMode";
 import { LoadingScreen } from "./LoadingScreen";
+import { ThinkingTips } from "./ThinkingTips";
 import "./PantryForm.css";
 import "./BatchCooking.css";
 
@@ -782,7 +783,12 @@ export function BatchCooking({ onBack, onDone }: BatchCookingProps) {
                   🔄
                 </button>
               </div>
-              {loadingPlan && <p className="batch-cooking__hint">Mamacita réfléchit...</p>}
+              {loadingPlan && (
+                <>
+                  <p className="batch-cooking__hint">Mamacita réfléchit...</p>
+                  <ThinkingTips />
+                </>
+              )}
               {planError && <p className="form-error">{planError}</p>}
               {plan && plan.length > 0 && (
                 <ol className="batch-cooking__plan">

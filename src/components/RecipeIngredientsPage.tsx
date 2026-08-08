@@ -14,6 +14,7 @@ import {
 import { estimateNutrition, estimatePriceRange, suggestIngredientSubstitutes, type SubstitutionSuggestion } from "../lib/assistant";
 import { SprigDoodle } from "./SprigDoodle";
 import { IngredientIllustrations } from "./IngredientIllustrations";
+import { RecipeBookExport } from "./RecipeBookExport";
 import "./BookPage.css";
 
 function formatPortionCost(value: number): string {
@@ -54,6 +55,7 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
   const [substitutions, setSubstitutions] = useState<Record<number, SubstitutionSuggestion[]>>({});
   const [loadingSubForId, setLoadingSubForId] = useState<number | null>(null);
   const [subError, setSubError] = useState<string | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +288,9 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
               {estimatingNutrition ? "Mamacita calcule..." : "🔥 Estimer la nutrition"}
             </button>
           )}
+          <button type="button" className="book-page__cost-btn" onClick={() => setExportingPdf(true)}>
+            📄 Exporter en PDF
+          </button>
         </div>
         {nutritionError && <p className="form-error">{nutritionError}</p>}
         {nutrition && (
@@ -349,6 +354,8 @@ export function RecipeIngredientsPage({ recipe, onEdit, onDelete }: RecipeIngred
           ))}
         </ul>
       </div>
+
+      {exportingPdf && <RecipeBookExport recipes={[{ id: recipe.id }]} onClose={() => setExportingPdf(false)} />}
     </>
   );
 }

@@ -10,6 +10,7 @@ import { ReceiptScanner } from "./ReceiptScanner";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LoadingScreen } from "./LoadingScreen";
+import { ThinkingTips } from "./ThinkingTips";
 import "./PantryRoom.css";
 
 interface PantryRoomProps {
@@ -148,6 +149,7 @@ export function PantryRoom({ onBack, onSuggestRecipe }: PantryRoomProps) {
           {isMobile ? "📸 Scanner un ticket" : "🧾 Scanner un ticket"}
         </button>
       </div>
+      {videFrigoLoading && <ThinkingTips />}
       {videFrigoError && <p className="pantry-room__vide-frigo-error">{videFrigoError}</p>}
 
       <div className="pantry-room__floor">

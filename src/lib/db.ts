@@ -1,6 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import { ingredientFamily, ingredientMatchesStaple } from "./ingredientMatching";
+import { humanRoundQuantity } from "./humanRound";
+import { ingredientFamily, ingredientMatchesStaple, singularize } from "./ingredientMatching";
 import { createUnitConverter } from "./unitConversion";
 
 function unwrap<T>(result: { data: T | null; error: PostgrestError | null }): T {
@@ -218,11 +219,30 @@ export async function getRecipeById(id: number): Promise<RecipeFull | null> {
   return { ...recipe, tags, ingredients, steps };
 }
 
+/** Clé de comparaison insensible à la casse/aux espaces/aux pluriels simples ("Lait" / "lait " / "laits"
+ * doivent tous désigner le même ingrédient plutôt que créer trois lignes distinctes qui se dispersent
+ * ensuite dans le garde-manger et la liste de courses). */
+function normalizeIngredientKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map(singularize)
+    .join(" ");
+}
+
 async function findOrCreateIngredient(name: string, category = "autre"): Promise<number> {
-  const { data: existing } = await supabase.from("ingredients").select("id").eq("name", name).maybeSingle();
-  if (existing) return existing.id;
+  const trimmedName = name.trim();
+  const key = normalizeIngredientKey(trimmedName);
+
+  const existingIngredients = unwrap<{ id: number; name: string }[]>(
+    await supabase.from("ingredients").select("id, name"),
+  );
+  const match = existingIngredients.find((ing) => normalizeIngredientKey(ing.name) === key);
+  if (match) return match.id;
+
   const inserted = unwrap<{ id: number }>(
-    await supabase.from("ingredients").insert({ name, category }).select("id").single(),
+    await supabase.from("ingredients").insert({ name: trimmedName, category }).select("id").single(),
   );
   return inserted.id;
 }
@@ -1055,7 +1075,7 @@ export async function previewBatchIngredients(
       quantity: Math.round(entry.displayQuantity * 100) / 100,
       unit_abbreviation: unit?.abbreviation ?? null,
       have_enough: haveBase >= entry.baseQuantity,
-      missing_quantity: Math.round(shortDisplay * 100) / 100,
+      missing_quantity: shortBase > 0 ? humanRoundQuantity(shortDisplay, unit?.abbreviation ?? null) : 0,
     });
   }
   return result.sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
@@ -1102,7 +1122,7 @@ export async function getMissingIngredientsForRecipe(recipeId: number, servings:
     const shortDisplay = unit ? shortBase / unit.factor_to_base : shortBase;
     missing.push({
       ingredient_name: ing.ingredient_name,
-      quantity: Math.round(shortDisplay * 100) / 100,
+      quantity: humanRoundQuantity(shortDisplay, unit?.abbreviation ?? null),
       unit_abbreviation: unit?.abbreviation ?? null,
     });
   }

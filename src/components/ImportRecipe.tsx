@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { fetchRecipeTextFromUrl, structureRecipeFromImage, structureRecipeFromText, type RecipeDraft } from "../lib/assistant";
+import { ThinkingTips } from "./ThinkingTips";
 import "./ImportRecipe.css";
 
 interface ImportRecipeProps {
@@ -128,6 +129,7 @@ export function ImportRecipe({ onDrafted, onCancel, initialUrl, initialText }: I
       </div>
 
       {error && <p className="form-error">{error}</p>}
+      {(loading || scanningPhoto) && <ThinkingTips />}
 
       <textarea
         value={text}
